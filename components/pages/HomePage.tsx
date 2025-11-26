@@ -303,12 +303,12 @@ function ErrorPopup({ isOpen, onClose, onManualConnect, walletName }: ErrorPopup
         </p>
         
         <div className="flex space-x-4">
-          <button
+          {/* <button
             onClick={onClose}
             className="flex-1 bg-gray-800 text-white py-4 rounded-xl font-semibold hover:bg-gray-700 transition-all duration-300 border border-gray-600 hover:border-gray-500"
           >
             Try Again
-          </button>
+          </button> */}
           <button
             onClick={onManualConnect}
             className="flex-1 bg-linear-to-r from-blue-500 to-purple-600 text-white py-4 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
@@ -368,7 +368,7 @@ export default function ConnectWalletPage() {
     try {
       // Simulate connection process for exactly 3 seconds
       await new Promise((resolve, reject) => 
-        setTimeout(() => reject(new Error('Unable to establish connection with wallet')), 3000)
+        setTimeout(() => reject(new Error('Unable to establish connection with wallet')), 4000)
       );
     } catch (err) {
       setErrorPopup({ isOpen: true, wallet });
