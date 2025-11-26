@@ -65,8 +65,8 @@ const WALLETS: WalletType[] = [
     name: 'Ledger',
     icon: '',
     colors: {
-      primary: '#2C2C2C',
-      secondary: '#1A1A1A',
+      primary: '#ededed',
+      secondary: '#fafafa',
       text: '#FFFFFF'
     }
   },
@@ -85,8 +85,8 @@ const WALLETS: WalletType[] = [
     name: 'Binance',
     icon: '',
     colors: {
-      primary: '#F0B90B',
-      secondary: '#D4A30C',
+      primary: '#1a1a1a',
+      secondary: '#232323',
       text: '#000000'
     }
   },
