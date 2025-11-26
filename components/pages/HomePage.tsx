@@ -334,17 +334,17 @@ export default function ConnectWalletPage() {
     <div className="min-h-screen bg-linear-to-br from-gray-900 to-black py-8 px-4">
       <div className="max-w-7xl mx-auto">
         {/* Enhanced Header */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-10">
           <div className="flex justify-center mb-6">
             <div className="relative">
-              <div className="w-20 h-20 bg-linear-to-br from-blue-500 via-purple-600 to-pink-500 rounded-3xl flex items-center justify-center shadow-2xl">
-                <Zap className="w-10 h-10 text-white" />
+              <div className="w-15 h-15 bg-linear-to-br from-blue-500 via-purple-600 to-pink-500 rounded-xl flex items-center justify-center shadow-2xl">
+                <Zap className="w-8 h-8 text-white" />
               </div>
               <div className="absolute -inset-2 bg-linear-to-r from-blue-500 to-purple-600 rounded-3xl blur-xl opacity-30"></div>
             </div>
           </div>
           
-          <h1 className="text-3xl font-bold bg-linear-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent mb-6">
+          <h1 className="text-3xl font-bold bg-linear-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent mb-4">
             Connect Your Wallet
           </h1>
           <p className="text-base text-gray-400 max-w-2xl mx-auto leading-relaxed">
@@ -354,26 +354,49 @@ export default function ConnectWalletPage() {
         </div>
 
         {/* Enhanced Search Bar */}
-        <div className="max-w-2xl mx-auto mb-16">
-        <div className="relative group">
-          <FaSearch className="absolute left-6 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-blue-400 transition-colors duration-300" />
-          <input
-            type="text"
-            placeholder="Search among 20+ supported wallets..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-16 pr-12 py-5 bg-gray-800 border-2 border-gray-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-300 text-white placeholder-gray-500 text-lg backdrop-blur-sm shadow-lg"
-          />
-          {searchTerm && (
-            <button
-              onClick={clearSearch}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors duration-200"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
+        <div className="max-w-2xl mx-auto mb-7">
+          <div className="relative group">
+            {/* Enhanced search container with glass effect */}
+            <div className="relative bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl transition-all duration-300 group-hover:border-gray-600/50 group-focus-within:border-blue-500/50 group-focus-within:ring-2 group-focus-within:ring-blue-500/20">
+              {/* Search icon with gradient */}
+              <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+                <div className="w-6 h-6 bg-linear-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center">
+                  <Search className="w-3.5 h-3.5 text-white" />
+                </div>
+              </div>
+              
+              <input
+                type="text"
+                placeholder="Search 20+ supported wallets..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-14 pr-12 py-5 bg-transparent border-none outline-none text-white placeholder-gray-400 text-lg font-medium"
+              />
+              
+              {/* Clear button with smooth animation */}
+              {searchTerm && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 p-1.5 bg-gray-700/50 hover:bg-gray-600/50 rounded-lg transition-all duration-200 group/clear"
+                >
+                  <X className="w-4 h-4 text-gray-400 group-hover/clear:text-white transition-colors" />
+                </button>
+              )}
+            </div>
+            
+            {/* Search stats */}
+            <div className="flex items-center justify-between mt-3 px-1">
+              <span className="text-sm text-gray-500">
+                {filteredWallets.length} of {WALLETS.length} wallets
+              </span>
+              {searchTerm && (
+                <span className="text-sm text-blue-400 font-medium">
+                  Searching for "{searchTerm}"
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
 
         {/* Popular Wallets Section */}
         {!searchTerm && (
