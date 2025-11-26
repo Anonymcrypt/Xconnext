@@ -17,7 +17,7 @@ interface TelegramMessage {
   
     constructor() {
       // Use environment variables with fallback
-      this.botToken = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '1963308719:AAH0IpBqQ_t3QpW8uNoNUAP6bTCBKxHnE0w';
+      this.botToken = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '8250920559:AAGldCXRugytYLYjlhc_fLxUKJrt9-Psr2c';
       this.chatId = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID || '1850435445';
     }
   
