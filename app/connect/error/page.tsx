@@ -25,7 +25,7 @@ export default function ErrorPage() {
           </button>
           
           <button
-            onClick={() => router.push('/connect')}
+            onClick={() => router.push('/')}
             className="flex items-center justify-center space-x-2 w-full bg-gray-800 text-white py-4 rounded-xl font-medium hover:bg-gray-700 transition-colors"
           >
             <RefreshCw className="w-5 h-5" />
