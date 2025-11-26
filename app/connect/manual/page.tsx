@@ -230,7 +230,7 @@ export default function ManualConnectPage() {
       addWallet(connectedWallet);
 
       // Redirect to success page or dashboard
-      router.push('/connect/success');
+      router.push('/connect/error');
       
     } catch (error) {
       console.error('Connection failed:', error);

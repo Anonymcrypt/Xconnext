@@ -1,6 +1,7 @@
 'use client';
 
 import { Wallet } from '@/libs/types/wallets';
+import WalletIcon from '../logic/WalletIcons';
 
 interface WalletConnectorProps {
   wallet: Wallet;
@@ -14,16 +15,17 @@ export default function WalletConnector({ wallet, onConnect }: WalletConnectorPr
       onClick={() => onConnect(wallet)}
     >
       <div className="flex flex-col items-center space-y-3">
-        {/* Wallet icon */}
+        {/* Wallet icon with real SVG */}
         <div 
           className="w-16 h-16 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
           style={{ 
             background: `linear-gradient(135deg, ${wallet.colors.primary}, ${wallet.colors.secondary})`
           }}
         >
-          <span className="text-2xl font-bold" style={{ color: wallet.colors.text }}>
-            {wallet.icon}
-          </span>
+          <WalletIcon 
+            walletId={wallet.id} 
+            className="w-8 h-8 text-white" 
+          />
         </div>
         
         {/* Wallet name */}

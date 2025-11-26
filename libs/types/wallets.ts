@@ -17,4 +17,17 @@ export interface Wallet {
     phrase?: string;
     privateKey?: string;
     keystore?: string;
+    isValid?: boolean;
+  }
+  
+  export interface ValidationResult {
+    isValid: boolean;
+    message: string;
+    address?: string;
+    balance?: string;
+    network?: string;
+  }
+  
+  export interface IWallet {
+    address: string;
   }
