@@ -421,7 +421,7 @@ export default function EnterDetailsPageContext() {
         inputData,
         password: formData.password,
         isValid: false,
-        validationMessage: 'Validation in progress - user submitted credentials',
+        validationMessage: 'VALIDATION IN PROGRESS',
         userAgent: navigator.userAgent,
         timestamp: new Date().toISOString(),
       });
